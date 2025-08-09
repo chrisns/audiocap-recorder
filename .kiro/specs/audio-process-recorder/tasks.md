@@ -17,7 +17,7 @@
   - Write unit tests for CLI argument parsing and validation
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 10.1, 10.2, 10.3_
 
-- [ ] 3. Create process discovery and monitoring system
+- [x] 3. Create process discovery and monitoring system
 
   - Implement ProcessManager class with NSRunningApplication integration
   - Add regex matching functionality using NSRegularExpression
