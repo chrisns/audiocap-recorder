@@ -63,7 +63,7 @@
   - Write unit tests for duration tracking and limits
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 8. Implement graceful shutdown and signal handling
+- [x] 8. Implement graceful shutdown and signal handling
 
   - Add SIGINT (Ctrl+C) signal handling for clean shutdown
   - Implement proper cleanup of ScreenCaptureKit resources
