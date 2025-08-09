@@ -1,6 +1,7 @@
 import Foundation
 import ScreenCaptureKit
 import AppKit
+import AVFoundation
 
 public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     public weak var delegate: AudioCapturerDelegate?
@@ -10,9 +11,28 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     private let sampleQueue = DispatchQueue(label: "audio.capturer.samples")
     private var recordingTimer: RecordingTimer?
 
-    public init(permissionManager: PermissionManaging = PermissionManager()) {
+    private let fileController: FileControllerProtocol
+    private let audioProcessor: AudioProcessorProtocol
+    private var outputDirectoryPath: String?
+
+    private var outputFile: AVAudioFile?
+    private var outputURL: URL?
+
+    public init(
+        permissionManager: PermissionManaging = PermissionManager(),
+        fileController: FileControllerProtocol = FileController(),
+        audioProcessor: AudioProcessorProtocol = AudioProcessor(),
+        outputDirectoryPath: String? = nil
+    ) {
         self.permissionManager = permissionManager
+        self.fileController = fileController
+        self.audioProcessor = audioProcessor
+        self.outputDirectoryPath = outputDirectoryPath
         super.init()
+    }
+
+    public func setOutputDirectory(_ path: String?) {
+        self.outputDirectoryPath = path
     }
 }
 
@@ -41,6 +61,18 @@ extension AudioCapturer {
         self.stream = stream
         delegate?.didStartRecording()
 
+        // Prepare output directory
+        let dirURL: URL
+        if let path = outputDirectoryPath, !path.isEmpty {
+            try? fileController.createOutputDirectory(path)
+            dirURL = URL(fileURLWithPath: NSString(string: path).expandingTildeInPath, isDirectory: true)
+        } else {
+            dirURL = fileController.defaultOutputDirectory()
+            try? FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        }
+        let fileURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename())
+        self.outputURL = fileURL
+
         // Start duration updates with 12-hour max as per requirements
         let maxSeconds = 12 * 60 * 60
         let timer = RecordingTimer(queue: .main, tickInterval: 1.0, maxDurationSeconds: maxSeconds)
@@ -58,17 +90,42 @@ extension AudioCapturer {
 
         guard let stream = stream else { return }
         stream.stopCapture { [weak self] error in
+            guard let self = self else { return }
             if let error = error {
-                self?.delegate?.didEncounterError(.audioCaptureFailed(error.localizedDescription))
+                self.delegate?.didEncounterError(.audioCaptureFailed(error.localizedDescription))
+            }
+            if let url = self.outputURL {
+                self.delegate?.didStopRecording(outputFileURL: url)
             }
         }
         self.stream = nil
+        self.outputFile = nil
     }
 }
 
 extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
     public func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
         guard outputType == .audio else { return }
+        // Lazily create output file when first buffer arrives
+        if outputFile == nil, let outURL = outputURL {
+            if let pcm = audioProcessor.processAudioBuffer(sampleBuffer, from: []) {
+                do {
+                    let file = try AVAudioFile(forWriting: outURL, settings: pcm.format.settings)
+                    try file.write(from: pcm)
+                    self.outputFile = file
+                } catch {
+                    delegate?.didEncounterError(.fileSystemError(error.localizedDescription))
+                }
+                return
+            }
+        }
+        if let file = outputFile, let pcm = audioProcessor.processAudioBuffer(sampleBuffer, from: []) {
+            do {
+                try file.write(from: pcm)
+            } catch {
+                delegate?.didEncounterError(.fileSystemError(error.localizedDescription))
+            }
+        }
     }
 
     public func stream(_ stream: SCStream, didStopWithError error: Error) {

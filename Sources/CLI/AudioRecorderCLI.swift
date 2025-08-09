@@ -26,22 +26,65 @@ public struct AudioRecorderCLI: ParsableCommand {
         }
     }
 
-    public mutating func run() throws {
+    public func run() throws {
         let permissionManager = PermissionManager()
         if !permissionManager.checkScreenRecordingPermission() {
             permissionManager.displayPermissionInstructions(for: .screenRecording)
             throw CleanExit.message("Screen recording permission is required. Please enable it and re-run.")
         }
 
-        print("Recording configuration:")
-        print("- Process regex: \(processRegex)")
+        let logger = Logger(verbose: verbose)
+        let errorPresenter = ErrorPresenter()
+        logger.info("Recording configuration:")
+        logger.info("- Process regex: \(processRegex)")
         if let output = outputDirectory, !output.isEmpty {
-            print("- Output directory: \(output)")
+            logger.info("- Output directory: \(output)")
         } else {
-            print("- Output directory: ~/Documents/audiocap/")
+            logger.info("- Output directory: ~/Documents/audiocap/")
         }
-        print("- Verbose: \(verbose)")
+        logger.info("- Verbose: \(verbose)")
 
-        // Further wiring will be implemented in later tasks
+        let processManager = ProcessManager()
+        let processes: [RecorderProcessInfo]
+        do {
+            processes = try processManager.discoverProcesses(matching: processRegex)
+        } catch let error as AudioRecorderError {
+            logger.error(errorPresenter.present(error))
+            throw CleanExit.message(error.localizedDescription)
+        }
+
+        if processes.isEmpty {
+            let err = AudioRecorderError.processNotFound(processRegex)
+            logger.error(errorPresenter.present(err))
+            throw CleanExit.message(err.localizedDescription)
+        }
+
+        var capturer = AudioCapturer(permissionManager: permissionManager)
+        capturer.setOutputDirectory(outputDirectory)
+
+        let shutdown = ShutdownCoordinator(audioCapturer: capturer, fileController: FileController())
+        let signalHandler = SignalHandler(signalNumber: SIGINT)
+        let outDir = self.outputDirectory
+        signalHandler.start {
+            shutdown.performGracefulShutdown(finalData: nil, outputDirectory: outDir)
+            Foundation.exit(0)
+        }
+
+        let processesCopy = processes
+        let loggerCopy = logger
+        let presenterCopy = errorPresenter
+        Task { @MainActor in
+            do {
+                try await capturer.startCapture(for: processesCopy)
+            } catch let error as AudioRecorderError {
+                loggerCopy.error(presenterCopy.present(error))
+                Foundation.exit(1)
+            } catch {
+                loggerCopy.error("Unexpected error: \(error.localizedDescription)")
+                Foundation.exit(1)
+            }
+        }
+
+        dispatchMain()
     }
 }

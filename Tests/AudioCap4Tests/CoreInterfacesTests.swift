@@ -21,4 +21,7 @@ private final class TestFileController: FileControllerProtocol {
     func writeAudioData(_ data: Data, to directory: String) throws -> URL {
         return URL(fileURLWithPath: directory).appendingPathComponent(generateTimestampedFilename())
     }
+    func defaultOutputDirectory() -> URL {
+        return URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+    }
 }
