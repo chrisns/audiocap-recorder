@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 public final class FileController: FileControllerProtocol {
     public init() {}
@@ -57,6 +58,30 @@ public final class FileController: FileControllerProtocol {
             try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
             let fileURL = dirURL.appendingPathComponent(jsonName)
             try mappingJSON.write(to: fileURL, options: .atomic)
+            return fileURL
+        } catch {
+            throw AudioRecorderError.fileSystemError(error.localizedDescription)
+        }
+    }
+
+    public func writeWAVBuffer(_ buffer: AVAudioPCMBuffer, to directory: String, bitDepth: Int) throws -> URL {
+        let dirURL = expandTilde(in: directory)
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename())
+
+        // Build settings enforcing linear PCM with specified bit depth
+        var settings: [String: Any] = [:]
+        settings[AVFormatIDKey] = kAudioFormatLinearPCM
+        settings[AVSampleRateKey] = buffer.format.sampleRate
+        settings[AVNumberOfChannelsKey] = Int(buffer.format.channelCount)
+        settings[AVLinearPCMBitDepthKey] = bitDepth
+        settings[AVLinearPCMIsFloatKey] = (bitDepth == 32) // we will set false for 16-bit
+        settings[AVLinearPCMIsBigEndianKey] = false
+        settings[AVLinearPCMIsNonInterleaved] = true
+
+        do {
+            let outFile = try AVAudioFile(forWriting: fileURL, settings: settings)
+            try outFile.write(from: buffer)
             return fileURL
         } catch {
             throw AudioRecorderError.fileSystemError(error.localizedDescription)

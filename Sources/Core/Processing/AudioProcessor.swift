@@ -158,6 +158,25 @@ public final class AudioProcessor: AudioProcessorProtocol {
         return out
     }
 
+    // MARK: - Format conversion helper
+    public func convert(buffer: AVAudioPCMBuffer, to targetFormat: AVAudioFormat) -> AVAudioPCMBuffer {
+        if buffer.format.sampleRate == targetFormat.sampleRate && buffer.format.channelCount == targetFormat.channelCount && buffer.format.commonFormat == targetFormat.commonFormat && buffer.format.isInterleaved == targetFormat.isInterleaved {
+            return buffer
+        }
+        guard let converter = AVAudioConverter(from: buffer.format, to: targetFormat) else { return buffer }
+        let frameCapacity = AVAudioFrameCount(buffer.frameLength)
+        guard let out = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frameCapacity) else { return buffer }
+        var error: NSError?
+        let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
+            outStatus.pointee = .haveData
+            return buffer
+        }
+        converter.convert(to: out, error: &error, withInputFrom: inputBlock)
+        if let _ = error { return buffer }
+        out.frameLength = min(out.frameCapacity, buffer.frameLength)
+        return out
+    }
+
     private func bufferDuration(_ buffer: AVAudioPCMBuffer) -> TimeInterval {
         return TimeInterval(buffer.frameLength) / buffer.format.sampleRate
     }

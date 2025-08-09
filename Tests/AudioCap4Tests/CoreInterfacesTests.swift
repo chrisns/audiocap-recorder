@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 @testable import AudioCap4
 
 final class CoreInterfacesTests: XCTestCase {
@@ -29,5 +30,8 @@ private final class TestFileController: FileControllerProtocol {
     }
     func writeChannelMappingLog(_ mappingJSON: Data, to directory: String, baseFilename: String) throws -> URL {
         return URL(fileURLWithPath: directory).appendingPathComponent("test-channels.json")
+    }
+    func writeWAVBuffer(_ buffer: AVAudioPCMBuffer, to directory: String, bitDepth: Int) throws -> URL {
+        return try writeAudioData(Data(), to: directory)
     }
 }

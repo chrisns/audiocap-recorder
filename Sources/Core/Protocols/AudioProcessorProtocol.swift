@@ -6,4 +6,5 @@ public protocol AudioProcessorProtocol {
     func mixAudioStreams(_ streams: [AVAudioPCMBuffer]) -> AVAudioPCMBuffer?
     func convertToWAV(_ buffer: AVAudioPCMBuffer) -> Data
     func combine(processAudio: AVAudioPCMBuffer, inputAudioByChannel: [Int: AVAudioPCMBuffer], totalChannels: Int) -> AVAudioPCMBuffer?
+    func convert(buffer: AVAudioPCMBuffer, to targetFormat: AVAudioFormat) -> AVAudioPCMBuffer
 }
