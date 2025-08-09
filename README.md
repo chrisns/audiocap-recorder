@@ -99,6 +99,56 @@ Notes:
 - Quotes are recommended to keep the shell from interpreting special characters.
 - If you want to target an exact bundle identifier instead, you can match it explicitly, e.g. "(?i)com\.google\.Chrome".
 
+## Multi-channel Recording (inputs + process audio)
+
+When `--capture-inputs` is provided, AudioCap4 captures available audio input devices along with process audio and prepares 8-channel output (in-progress pipeline):
+
+- Channels 1–2: Process audio (stereo)
+- Channels 3–8: Input devices (up to 6 devices, one per channel)
+- Unused channels are silent (zero-filled)
+
+A channel mapping JSON is written alongside the WAV file to document device-to-channel assignments and any device hot-swaps during the session.
+
+### Channel mapping JSON
+
+- Filename: `<timestamp>-channels.json` (e.g., `2025-01-01-12-00-00-channels.json`)
+- Contents include a session identifier, device events, and the channel-to-device map. Example structure:
+
+```json
+{
+  "sessionId": "...",
+  "channels": {
+    "1": "process",
+    "2": "process",
+    "3": "Built-in Microphone",
+    "4": "USB Mic"
+  },
+  "events": [
+    { "timestamp": "...", "event": "connected", "device": "USB Mic", "channel": 4 },
+    { "timestamp": "...", "event": "disconnected", "device": "USB Mic", "channel": 4 }
+  ]
+}
+```
+
+### Device hot-swapping
+
+- Connecting a new input device assigns it to the next available channel (3–8)
+- Disconnecting a device marks its channel silent while preserving other channels
+- Reconnecting attempts to restore the previous channel assignment when available
+
+## Troubleshooting
+
+- No audio captured:
+  - Verify Screen Recording permission is enabled for your terminal/Xcode
+  - Try running with a simpler regex (e.g., `"(?i)chrome"`) and confirm target process is active
+- No input device audio with `--capture-inputs`:
+  - Ensure Microphone permission is granted for your terminal/Xcode
+  - Confirm at least one input device is available in System Settings → Sound → Input
+- Headless or remote environments:
+  - Integration tests may skip or be limited without a main display or permissions
+- Bluetooth or USB devices:
+  - Some devices introduce latency or sample-rate changes; reconnection can alter timing
+
 ## Run Tests
 
 ```bash
@@ -131,4 +181,5 @@ cp ./.build/release/audiocap-recorder ~/bin/
 
 - Process matching uses a regular expression against discovered process names and paths. Start simple (e.g., "Chrome") and refine as needed (e.g., "com\\.google\\.Chrome").
 - On first use, confirm Screen Recording permission or re-run after granting.
+- With `--capture-inputs`, confirm Microphone permission and available input devices.
 - Output audio is written as PCM `.wav` using the app’s current capture pipeline.
