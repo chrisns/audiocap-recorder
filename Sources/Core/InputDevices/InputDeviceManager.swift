@@ -8,11 +8,12 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
     private var channelByUID: [String: Int] = [:] // uid -> channel (3-8)
     private var observers: [NSObjectProtocol] = []
 
+    private var enginesByUID: [String: AVAudioEngine] = [:]
+    private var inputNodesByUID: [String: AVAudioInputNode] = [:]
+
     func enumerateInputDevices() -> [AudioInputDevice] {
         let devices = AVCaptureDevice.devices(for: .audio)
         let mapped: [AudioInputDevice] = devices.map { device in
-            // AVFoundation does not expose sample rate or channel count directly here.
-            // Use conservative defaults; detailed format handling will occur in capture stage (Task 17).
             AudioInputDevice(
                 uid: device.uniqueID,
                 name: device.localizedName,
@@ -22,11 +23,7 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
                 isConnected: true
             )
         }
-        // Refresh internal device map
-        for dev in mapped {
-            connectedDevicesByUID[dev.uid] = dev
-        }
-        // Assign channels and return updated list
+        for dev in mapped { connectedDevicesByUID[dev.uid] = dev }
         let updated = assignChannels(for: Array(connectedDevicesByUID.values))
         return updated
     }
@@ -57,6 +54,7 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
             let previousChannel = self.channelByUID[uid]
             self.connectedDevicesByUID.removeValue(forKey: uid)
             self.channelByUID.removeValue(forKey: uid)
+            self.stopCapture(forUID: uid)
             _ = self.assignChannels(for: Array(self.connectedDevicesByUID.values))
             if let chan = previousChannel {
                 let dev = AudioInputDevice(uid: uid, name: device.localizedName, channelCount: 1, sampleRate: 48_000, assignedChannel: nil, isConnected: false)
@@ -71,13 +69,22 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
         observers.removeAll()
     }
 
+    func startCapturing() {
+        for (_, device) in connectedDevicesByUID {
+            startCapture(for: device)
+        }
+    }
+
+    func stopCapturing() {
+        for uid in enginesByUID.keys { stopCapture(forUID: uid) }
+    }
+
     func currentChannelAssignments() -> [Int: AudioInputDevice] {
         var result: [Int: AudioInputDevice] = [:]
         for (uid, channel) in channelByUID {
-            if let dev = connectedDevicesByUID[uid] {
-                var updated = dev
-                updated.assignedChannel = channel
-                result[channel] = updated
+            if var dev = connectedDevicesByUID[uid] {
+                dev.assignedChannel = channel
+                result[channel] = dev
             }
         }
         return result
@@ -86,39 +93,86 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
 
 // MARK: - Channel assignment (3-8)
 extension InputDeviceManager {
-    /// Assigns channels 3-8 to up to six devices. Keeps previous assignments when possible.
-    /// - Returns: Updated device list with `assignedChannel` populated for assigned devices.
     func assignChannels(for devices: [AudioInputDevice]) -> [AudioInputDevice] {
-        // Preserve channels for already-assigned devices that are still present
         let presentUIDs = Set(devices.map { $0.uid })
         channelByUID = channelByUID.filter { presentUIDs.contains($0.key) }
 
         let availableChannels = Array(3...8)
         var usedChannels = Set(channelByUID.values)
 
-        // Assign channels to unassigned devices in deterministic order (by uid)
         let unassignedUIDs = devices
             .map { $0.uid }
             .filter { channelByUID[$0] == nil }
             .sorted()
 
         for uid in unassignedUIDs {
-            guard let nextChannel = availableChannels.first(where: { !usedChannels.contains($0) }) else {
-                break // no channels left
-            }
+            guard let nextChannel = availableChannels.first(where: { !usedChannels.contains($0) }) else { break }
             channelByUID[uid] = nextChannel
             usedChannels.insert(nextChannel)
         }
 
-        // Produce updated device list with assignedChannel values
         var updated: [AudioInputDevice] = []
         updated.reserveCapacity(devices.count)
         for var dev in devices {
             dev.assignedChannel = channelByUID[dev.uid]
             updated.append(dev)
         }
-        // Refresh device map with updated assignedChannel
         for dev in updated { connectedDevicesByUID[dev.uid] = dev }
         return updated
+    }
+}
+
+// MARK: - Capture per device
+private extension InputDeviceManager {
+    func startCapture(for device: AudioInputDevice) {
+        guard enginesByUID[device.uid] == nil else { return }
+        let engine = AVAudioEngine()
+        let input = engine.inputNode
+        let hwFormat = input.inputFormat(forBus: 0)
+        let targetSR: Double = 48_000
+        let targetChannels: AVAudioChannelCount = 1
+        let targetFormat = AVAudioFormat(standardFormatWithSampleRate: targetSR, channels: targetChannels)!
+
+        input.removeTap(onBus: 0)
+        input.installTap(onBus: 0, bufferSize: 1024, format: hwFormat) { [weak self] buffer, _ in
+            guard let self else { return }
+            // Convert to 48kHz mono if needed
+            let converted = self.convert(buffer: buffer, to: targetFormat)
+            let dev = self.connectedDevicesByUID[device.uid] ?? device
+            self.delegate?.audioDataReceived(from: dev, buffer: converted)
+        }
+
+        do {
+            try engine.start()
+            enginesByUID[device.uid] = engine
+            inputNodesByUID[device.uid] = input
+        } catch {
+            // Non-fatal for Task 17 scaffolding
+        }
+    }
+
+    func stopCapture(forUID uid: String) {
+        if let input = inputNodesByUID[uid] { input.removeTap(onBus: 0) }
+        if let engine = enginesByUID[uid] { engine.stop() }
+        inputNodesByUID.removeValue(forKey: uid)
+        enginesByUID.removeValue(forKey: uid)
+    }
+
+    func convert(buffer: AVAudioPCMBuffer, to format: AVAudioFormat) -> AVAudioPCMBuffer {
+        if buffer.format.sampleRate == format.sampleRate && buffer.format.channelCount == format.channelCount {
+            return buffer
+        }
+        let converter = AVAudioConverter(from: buffer.format, to: format)!
+        let frameCapacity = AVAudioFrameCount(buffer.frameLength)
+        let out = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity)!
+        var error: NSError?
+        let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
+            outStatus.pointee = .haveData
+            return buffer
+        }
+        converter.convert(to: out, error: &error, withInputFrom: inputBlock)
+        if let _ = error { return buffer }
+        out.frameLength = min(out.frameCapacity, buffer.frameLength)
+        return out
     }
 }

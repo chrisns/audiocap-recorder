@@ -1,8 +1,10 @@
 import Foundation
+import AVFoundation
 
 public protocol InputDeviceManagerDelegate: AnyObject {
     func deviceConnected(_ device: AudioInputDevice, assignedToChannel channel: Int)
     func deviceDisconnected(_ device: AudioInputDevice, fromChannel channel: Int)
+    func audioDataReceived(from device: AudioInputDevice, buffer: AVAudioPCMBuffer)
 }
 
 public protocol InputDeviceManagerProtocol: AnyObject {
@@ -10,6 +12,8 @@ public protocol InputDeviceManagerProtocol: AnyObject {
     func enumerateInputDevices() -> [AudioInputDevice]
     func startMonitoring()
     func stopMonitoring()
+    func startCapturing()
+    func stopCapturing()
     func currentChannelAssignments() -> [Int: AudioInputDevice]
 }
 

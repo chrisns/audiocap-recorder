@@ -148,7 +148,7 @@
   - Write unit tests for device enumeration and channel assignment
   - _Requirements: 12.1, 12.2, 13.1, 13.2_
 
-- [ ] 17. Build audio input device capture system with AVAudioEngine
+- [x] 17. Build audio input device capture system with AVAudioEngine
 
   - Create audio capture setup for each discovered input device using AVAudioEngine
   - Implement per-device audio buffer capture with proper format conversion to 48kHz
