@@ -1,5 +1,6 @@
 import Foundation
 import ArgumentParser
+import AVFoundation
 
 public struct AudioRecorderCLI: ParsableCommand {
     public static let configuration: CommandConfiguration = CommandConfiguration(
@@ -75,6 +76,27 @@ public struct AudioRecorderCLI: ParsableCommand {
             }
         }
 
+        // Optional input device manager lifecycle
+        var inputManager: InputDeviceManager? = nil
+        if captureInputs {
+            let manager = InputDeviceManager()
+            let reporter = InputStatusReporter(logger: logger)
+            manager.delegate = reporter
+            let devices = manager.enumerateInputDevices()
+            if devices.isEmpty {
+                logger.warn("No input devices detected. Proceeding with process audio only.")
+            } else {
+                let mapping = manager.currentChannelAssignments().sorted(by: { $0.key < $1.key })
+                logger.info("Input channel assignments:")
+                for (channel, device) in mapping {
+                    logger.info("- Channel \(channel): \(device.name) [uid=\(device.uid)]")
+                }
+            }
+            manager.startMonitoring()
+            manager.startCapturing()
+            inputManager = manager
+        }
+
         let capturer = AudioCapturer(permissionManager: permissionManager)
         capturer.setOutputDirectory(outputDirectory)
 
@@ -82,6 +104,11 @@ public struct AudioRecorderCLI: ParsableCommand {
         let signalHandler = SignalHandler(signalNumber: SIGINT)
         let outDir = self.outputDirectory
         signalHandler.start {
+            // Stop input devices first
+            if let im = inputManager {
+                im.stopCapturing()
+                im.stopMonitoring()
+            }
             shutdown.performGracefulShutdown(finalData: nil, outputDirectory: outDir)
             Foundation.exit(0)
         }
@@ -89,18 +116,45 @@ public struct AudioRecorderCLI: ParsableCommand {
         let processesCopy = processes
         let loggerCopy = logger
         let presenterCopy = errorPresenter
-        Task { @MainActor in
+        Task {
             do {
                 try await capturer.startCapture(for: processesCopy)
             } catch let error as AudioRecorderError {
                 loggerCopy.error(presenterCopy.present(error))
+                // Stop input devices on error
+                if let im = inputManager {
+                    im.stopCapturing()
+                    im.stopMonitoring()
+                }
                 Foundation.exit(1)
             } catch {
                 loggerCopy.error("Unexpected error: \(error.localizedDescription)")
+                if let im = inputManager {
+                    im.stopCapturing()
+                    im.stopMonitoring()
+                }
                 Foundation.exit(1)
             }
         }
 
         dispatchMain()
+    }
+}
+
+// MARK: - Input status reporter
+final class InputStatusReporter: InputDeviceManagerDelegate {
+    private let logger: Logger
+    init(logger: Logger) { self.logger = logger }
+
+    func deviceConnected(_ device: AudioInputDevice, assignedToChannel channel: Int) {
+        logger.info("Input device connected: \(device.name) -> channel \(channel)")
+    }
+
+    func deviceDisconnected(_ device: AudioInputDevice, fromChannel channel: Int) {
+        logger.info("Input device disconnected: \(device.name) from channel \(channel)")
+    }
+
+    func audioDataReceived(from device: AudioInputDevice, buffer: AVAudioPCMBuffer) {
+        // For Task 22, we only report status. Future tasks will combine into multi-channel output.
     }
 }

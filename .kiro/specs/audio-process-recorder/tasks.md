@@ -198,7 +198,7 @@
   - Write unit tests for permission handling and user guidance flows
   - _Requirements: 12.1, 14.4_
 
-- [ ] 22. Integrate input device capture with main recording workflow
+- [x] 22. Integrate input device capture with main recording workflow
 
   - Wire InputDeviceManager into main application lifecycle alongside existing components
   - Coordinate input device capture startup/shutdown with process audio capture
