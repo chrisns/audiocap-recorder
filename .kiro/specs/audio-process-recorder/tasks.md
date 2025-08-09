@@ -8,7 +8,7 @@
   - Create basic error types and data models
   - _Requirements: 1.1, 5.1, 7.1_
 
-- [ ] 2. Implement CLI interface with ArgumentParser
+- [x] 2. Implement CLI interface with ArgumentParser
 
   - Create main CLI struct conforming to ParsableCommand
   - Define command-line arguments (@Argument for regex, @Option for output directory, @Flag for verbose)
