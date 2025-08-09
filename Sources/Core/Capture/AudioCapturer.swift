@@ -53,15 +53,13 @@ extension AudioCapturer {
             throw AudioRecorderError.configurationError("No display available for content filter")
         }
 
-        let filter = SCContentFilter(display: display, including: [], exceptingWindows: [])
+        // Capture the display; audio is system-wide via ScreenCaptureKit
+        let filter = SCContentFilter(display: display, excludingWindows: [])
 
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addStreamOutput(self, type: SCStreamOutputType.audio, sampleHandlerQueue: sampleQueue)
-        try await stream.startCapture()
-        self.stream = stream
-        delegate?.didStartRecording()
 
-        // Prepare output directory
+        // Prepare output directory and pre-create file with standard format
         let dirURL: URL
         if let path = outputDirectoryPath, !path.isEmpty {
             try? fileController.createOutputDirectory(path)
@@ -72,6 +70,18 @@ extension AudioCapturer {
         }
         let fileURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename())
         self.outputURL = fileURL
+
+        // Initialize output file immediately with 48kHz stereo float format
+        let standard = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+        do {
+            self.outputFile = try AVAudioFile(forWriting: fileURL, settings: standard.settings)
+        } catch {
+            delegate?.didEncounterError(.fileSystemError(error.localizedDescription))
+        }
+
+        try await stream.startCapture()
+        self.stream = stream
+        delegate?.didStartRecording()
 
         // Start duration updates with 12-hour max as per requirements
         let maxSeconds = 12 * 60 * 60
@@ -106,25 +116,11 @@ extension AudioCapturer {
 extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
     public func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
         guard outputType == .audio else { return }
-        // Lazily create output file when first buffer arrives
-        if outputFile == nil, let outURL = outputURL {
-            if let pcm = audioProcessor.processAudioBuffer(sampleBuffer, from: []) {
-                do {
-                    let file = try AVAudioFile(forWriting: outURL, settings: pcm.format.settings)
-                    try file.write(from: pcm)
-                    self.outputFile = file
-                } catch {
-                    delegate?.didEncounterError(.fileSystemError(error.localizedDescription))
-                }
-                return
-            }
-        }
-        if let file = outputFile, let pcm = audioProcessor.processAudioBuffer(sampleBuffer, from: []) {
-            do {
-                try file.write(from: pcm)
-            } catch {
-                delegate?.didEncounterError(.fileSystemError(error.localizedDescription))
-            }
+        guard let file = outputFile, let pcm = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
+        do {
+            try file.write(from: pcm)
+        } catch {
+            delegate?.didEncounterError(.fileSystemError(error.localizedDescription))
         }
     }
 

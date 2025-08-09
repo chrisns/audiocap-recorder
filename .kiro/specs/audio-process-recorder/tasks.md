@@ -106,3 +106,11 @@
   - Create end-to-end integration tests
   - Verify all requirements are met through comprehensive testing
   - _Requirements: All requirements integration and validation_
+
+- [x] 13. Fix system audio capture and WAV writing, and verify waveform contains audio
+
+  - Correct CMSampleBuffer → AVAudioPCMBuffer conversion using CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer and proper format handling
+  - Ensure SCStream/SCContentFilter configuration includes system audio
+  - Create and write WAV files continuously with a reasonable file size
+  - Verify end-to-end by recording Chrome for ~10–15s, confirm file exists in `~/Documents/audiocap/`, size is reasonable, and RMS amplitude > 0
+  - Run all tests and ensure they pass
