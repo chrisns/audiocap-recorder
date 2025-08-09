@@ -27,7 +27,16 @@ public final class FileController: FileControllerProtocol {
             try data.write(to: fileURL, options: .atomic)
             return fileURL
         } catch {
-            throw AudioRecorderError.fileSystemError(error.localizedDescription)
+            // Fallback to default directory
+            let fallbackDir = defaultOutputDirectory()
+            do {
+                try FileManager.default.createDirectory(at: fallbackDir, withIntermediateDirectories: true)
+                let fallbackURL = fallbackDir.appendingPathComponent(generateTimestampedFilename())
+                try data.write(to: fallbackURL, options: .atomic)
+                return fallbackURL
+            } catch {
+                throw AudioRecorderError.fileSystemError(error.localizedDescription)
+            }
         }
     }
 
