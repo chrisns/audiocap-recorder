@@ -100,6 +100,7 @@
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [x] 12. Integrate all components and implement main application flow
+
   - Wire together CLI, ProcessManager, AudioCapturer, AudioProcessor, and FileController
   - Implement complete recording session lifecycle
   - Add proper resource cleanup and memory management
@@ -127,3 +128,105 @@
   - Ensure the test is marked as integration-only and can be skipped on CI if permissions are unavailable (but runnable locally)
   - Update `Package.swift` to include the new helper target and the integration test
   - All existing tests must continue to pass
+
+- [x] 15. Add --capture-inputs CLI option and update argument parsing
+
+  - Add `@Flag(name: .shortAndLong, help: "Capture all audio input devices in addition to process audio") var captureInputs: Bool = false` to AudioRecorderCLI
+  - Update help text and usage examples to include the new flag
+  - Modify main application flow to conditionally enable input device capture based on flag
+  - Add validation to ensure microphone permissions are checked when --capture-inputs is used
+  - Write unit tests for CLI argument parsing with the new flag
+  - _Requirements: 12.1, 14.1_
+
+- [ ] 16. Implement InputDeviceManager for audio input device enumeration and monitoring
+
+  - Create InputDeviceManager class with AVFoundation integration for device discovery
+  - Implement device enumeration using AVAudioSession and AVCaptureDevice APIs
+  - Add device metadata collection (name, UID, channel count, sample rate)
+  - Create device connection/disconnection monitoring using AVAudioSession.routeChangeNotification
+  - Implement channel assignment logic for up to 6 input devices (channels 3-8)
+  - Write unit tests for device enumeration and channel assignment
+  - _Requirements: 12.1, 12.2, 13.1, 13.2_
+
+- [ ] 17. Build audio input device capture system with AVAudioEngine
+
+  - Create audio capture setup for each discovered input device using AVAudioEngine
+  - Implement per-device audio buffer capture with proper format conversion to 48kHz
+  - Add device-specific audio processing and sample rate conversion
+  - Create audio buffer routing to assigned channels (3-8)
+  - Handle device-specific audio format differences and channel mapping
+  - Write integration tests for multi-device audio capture
+  - _Requirements: 12.1, 12.2, 12.3_
+
+- [ ] 18. Implement device hot-swapping and reconnection handling
+
+  - Add real-time device connection/disconnection detection using AVAudioSession notifications
+  - Implement automatic channel reassignment when devices connect/disconnect
+  - Create device reconnection logic that restores previous channel assignments when possible
+  - Add graceful handling of device disconnection during active recording
+  - Log device events with timestamps for channel mapping reference
+  - Write unit tests for hot-swapping scenarios and edge cases
+  - _Requirements: 13.1, 13.2, 13.3, 13.4_
+
+- [ ] 19. Enhance AudioProcessor for 8-channel audio processing
+
+  - Modify AudioProcessor to handle 8-channel audio buffer creation and management
+  - Implement audio buffer combination logic (process audio on channels 1-2, input devices on 3-8)
+  - Add sample rate synchronization between process audio and input device audio
+  - Create buffer alignment and timestamp correlation for multi-source audio
+  - Implement silent channel handling for unused input device channels
+  - Write unit tests for 8-channel audio processing and buffer management
+  - _Requirements: 12.2, 12.3, 12.4_
+
+- [ ] 20. Update FileController for 8-channel WAV output and channel mapping logs
+
+  - Modify WAV file writing to support 8-channel audio format using AudioToolbox
+  - Create channel mapping log file generation in JSON format alongside WAV files
+  - Implement real-time channel mapping updates when devices connect/disconnect
+  - Add device event logging with timestamps and channel assignments
+  - Update file naming convention to include channel mapping files (e.g., filename-channels.json)
+  - Write unit tests for 8-channel WAV creation and channel mapping file generation
+  - _Requirements: 12.2, 14.2, 14.3, 14.4_
+
+- [ ] 21. Add microphone permission handling and user guidance
+
+  - Implement microphone permission checking using AVAudioSession authorization
+  - Add permission request flow for microphone access when --capture-inputs is used
+  - Create user guidance messages for enabling microphone permissions in System Preferences
+  - Update PermissionManager to handle both screen recording and microphone permissions
+  - Add graceful fallback when microphone permissions are denied (process-only recording)
+  - Write unit tests for permission handling and user guidance flows
+  - _Requirements: 12.1, 14.4_
+
+- [ ] 22. Integrate input device capture with main recording workflow
+
+  - Wire InputDeviceManager into main application lifecycle alongside existing components
+  - Coordinate input device capture startup/shutdown with process audio capture
+  - Implement proper resource cleanup for input devices and audio engines
+  - Add real-time status display showing active input devices and channel assignments
+  - Create unified error handling for both process audio and input device failures
+  - Write integration tests for complete 8-channel recording workflow
+  - _Requirements: 12.1, 13.1, 14.1, 14.2_
+
+- [ ] 23. Add comprehensive testing for multi-channel audio functionality
+
+  - Create mock input devices for testing device enumeration and hot-swapping
+  - Implement integration tests for 8-channel audio capture and WAV file validation
+  - Add performance tests for multi-device audio processing and memory usage
+  - Create end-to-end tests combining process audio and input device capture
+  - Verify channel mapping logs are accurate and properly formatted
+  - Ensure all existing tests continue to pass with new multi-channel functionality
+  - _Requirements: 12.1, 12.2, 13.1, 13.2, 14.1, 14.2_
+
+- [ ] 24. Update documentation and finalize multi-channel audio feature
+
+  - Update README.md with comprehensive documentation of the new --capture-inputs feature
+  - Document 8-channel WAV output format and channel mapping (channels 1-2: process audio, 3-8: input devices)
+  - Add usage examples showing how to use --capture-inputs flag with process regex patterns
+  - Document device hot-swapping behavior and channel mapping log files
+  - Include microphone permission requirements and setup instructions
+  - Add troubleshooting section for common input device issues
+  - Update command-line help examples and usage scenarios
+  - Verify all code documentation and comments are up to date
+  - Run final integration tests to ensure all features work together
+  - _Requirements: 12.1, 12.2, 13.1, 13.2, 14.1, 14.2, 14.3, 14.4_

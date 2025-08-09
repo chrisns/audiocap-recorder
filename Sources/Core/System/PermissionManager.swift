@@ -1,9 +1,12 @@
 import Foundation
 import CoreGraphics
+import AVFoundation
 
 public protocol PermissionManaging {
     func checkScreenRecordingPermission() -> Bool
     func requestScreenRecordingPermission()
+    func checkMicrophonePermission() -> Bool
+    func requestMicrophonePermission(completion: @escaping (Bool) -> Void)
     func displayPermissionInstructions(for type: AudioRecorderError.PermissionType)
 }
 
@@ -19,6 +22,17 @@ public struct PermissionManager: PermissionManaging {
         _ = CGRequestScreenCaptureAccess()
     }
 
+    public func checkMicrophonePermission() -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        return status == .authorized
+    }
+
+    public func requestMicrophonePermission(completion: @escaping (Bool) -> Void) {
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            completion(granted)
+        }
+    }
+
     public func displayPermissionInstructions(for type: AudioRecorderError.PermissionType) {
         switch type {
         case .screenRecording:
@@ -29,6 +43,9 @@ public struct PermissionManager: PermissionManaging {
             print("File System permission may be required to write recordings to the chosen directory.")
         case .accessibility:
             print("Accessibility permission may be required for process correlation features.")
+        case .microphone:
+            print("Microphone permission is required to capture audio input devices when using --capture-inputs.")
+            print("Open System Settings > Privacy & Security > Microphone and enable access for your terminal/Xcode.")
         }
     }
 }

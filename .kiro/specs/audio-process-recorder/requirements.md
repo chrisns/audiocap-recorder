@@ -128,3 +128,36 @@ This feature involves creating a command-line macOS application that can record 
 2. WHEN target processes are active and generating audio THEN the system SHALL include that audio in the recording
 3. WHEN non-target processes generate audio THEN the system SHALL attempt to filter out that audio from the recording
 4. WHEN audio correlation is uncertain THEN the system SHALL include the audio but log a warning about potential mixed sources
+
+### Requirement 12
+
+**User Story:** As a user, I want to capture all available audio input devices simultaneously with the process audio, so that I can record comprehensive audio sessions that include microphones, line inputs, and other audio sources alongside application audio.
+
+#### Acceptance Criteria
+
+1. WHEN the --capture-inputs CLI option is provided THEN the system SHALL enumerate and capture from all available audio input devices
+2. WHEN audio input devices are captured THEN the system SHALL create an 8-channel WAV file with process audio on channels 1-2 and input devices on channels 3-8
+3. WHEN fewer than 6 input devices are available THEN the system SHALL leave unused channels silent in the 8-channel file
+4. WHEN more than 6 input devices are available THEN the system SHALL capture the first 6 devices and log a warning about additional devices being ignored
+
+### Requirement 13
+
+**User Story:** As a user, I want the system to handle audio input device hot-swapping during recording, so that I can connect/disconnect devices like Bluetooth headphones or unplug my laptop without interrupting the recording session.
+
+#### Acceptance Criteria
+
+1. WHEN an audio input device is connected during recording THEN the system SHALL detect the new device and assign it to the next available channel (3-8)
+2. WHEN an audio input device is disconnected during recording THEN the system SHALL continue recording with remaining devices and mark the disconnected channel as silent
+3. WHEN a previously disconnected device reconnects THEN the system SHALL reassign it to an available channel and resume capturing its audio
+4. WHEN device changes occur THEN the system SHALL log device connection/disconnection events with timestamps for reference
+
+### Requirement 14
+
+**User Story:** As a user, I want clear channel mapping information in the output, so that I can identify which audio sources correspond to which channels in the 8-channel recording.
+
+#### Acceptance Criteria
+
+1. WHEN recording starts with input capture enabled THEN the system SHALL display a channel mapping showing which devices are assigned to channels 3-8
+2. WHEN device changes occur during recording THEN the system SHALL update and display the current channel mapping
+3. WHEN recording completes THEN the system SHALL save a channel mapping log file alongside the WAV file with device assignments and timing information
+4. WHEN no input devices are available THEN the system SHALL clearly indicate that only process audio (channels 1-2) will be recorded

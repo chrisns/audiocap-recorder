@@ -16,6 +16,9 @@ public struct AudioRecorderCLI: ParsableCommand {
     @Flag(name: .shortAndLong, help: "Enable verbose logging")
     public var verbose: Bool = false
 
+    @Flag(name: .shortAndLong, help: "Capture all audio input devices in addition to process audio")
+    public var captureInputs: Bool = false
+
     public init() {}
 
     public func validate() throws {
@@ -33,6 +36,13 @@ public struct AudioRecorderCLI: ParsableCommand {
             throw CleanExit.message("Screen recording permission is required. Please enable it and re-run.")
         }
 
+        if captureInputs {
+            if !permissionManager.checkMicrophonePermission() {
+                permissionManager.displayPermissionInstructions(for: .microphone)
+                throw CleanExit.message("Microphone permission is required when using --capture-inputs. Please enable it and re-run.")
+            }
+        }
+
         let logger = Logger(verbose: verbose)
         let errorPresenter = ErrorPresenter()
         logger.info("Recording configuration:")
@@ -43,6 +53,7 @@ public struct AudioRecorderCLI: ParsableCommand {
             logger.info("- Output directory: ~/Documents/audiocap/")
         }
         logger.info("- Verbose: \(verbose)")
+        logger.info("- Capture inputs: \(captureInputs)")
 
         let processManager = ProcessManager()
         let processes: [RecorderProcessInfo]

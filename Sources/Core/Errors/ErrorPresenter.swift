@@ -13,6 +13,8 @@ public struct ErrorPresenter {
                 return "File System permission error. Check directory permissions or choose another output location."
             case .accessibility:
                 return "Accessibility permission may be required to correlate processes. Enable it in System Settings > Privacy & Security > Accessibility."
+            case .microphone:
+                return "Microphone permission is required when using --capture-inputs. Enable it in System Settings > Privacy & Security > Microphone."
             }
         case .processNotFound(let pattern):
             return "No processes matched pattern: \(pattern). Try a broader regex or verify process names/paths."

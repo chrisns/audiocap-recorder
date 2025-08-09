@@ -7,6 +7,17 @@ final class CLITests: XCTestCase {
         XCTAssertEqual(cli.processRegex, "com.*chrome")
         XCTAssertEqual(cli.outputDirectory, "/tmp")
         XCTAssertTrue(cli.verbose)
+        XCTAssertFalse(cli.captureInputs)
+    }
+
+    func testCLIParsesCaptureInputsLongFlag() throws {
+        let cli = try AudioRecorderCLI.parse(["Spotify|Music", "--capture-inputs"])        
+        XCTAssertTrue(cli.captureInputs)
+    }
+
+    func testCLIParsesCaptureInputsShortFlag() throws {
+        let cli = try AudioRecorderCLI.parse(["Spotify|Music", "-c"])        
+        XCTAssertTrue(cli.captureInputs)
     }
 
     func testCLIRejectsInvalidRegex() {

@@ -12,6 +12,7 @@ public enum AudioRecorderError: LocalizedError, Equatable, Sendable {
         case screenRecording
         case fileSystem
         case accessibility
+        case microphone
     }
 
     public var errorDescription: String? {

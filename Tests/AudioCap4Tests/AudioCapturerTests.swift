@@ -4,6 +4,8 @@ import XCTest
 private final class DeniedPermissionManager: PermissionManaging {
     func checkScreenRecordingPermission() -> Bool { false }
     func requestScreenRecordingPermission() {}
+    func checkMicrophonePermission() -> Bool { false }
+    func requestMicrophonePermission(completion: @escaping (Bool) -> Void) { completion(false) }
     func displayPermissionInstructions(for type: AudioRecorderError.PermissionType) {}
 }
 
