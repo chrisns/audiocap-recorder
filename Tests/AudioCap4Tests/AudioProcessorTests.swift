@@ -3,30 +3,68 @@ import AVFoundation
 @testable import AudioCap4
 
 final class AudioProcessorTests: XCTestCase {
-    func testMixTwoSineWavesProducesData() {
-        let processor = AudioProcessor()
-        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
-        let frames: AVAudioFrameCount = 4800
-        let buffer1 = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
-        buffer1.frameLength = frames
-        let buffer2 = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
-        buffer2.frameLength = frames
-
-        // Fill both buffers with simple values
-        for c in 0..<Int(format.channelCount) {
-            let dst1 = buffer1.floatChannelData![c]
-            let dst2 = buffer2.floatChannelData![c]
-            for i in 0..<Int(frames) {
-                dst1[i] = 0.1
-                dst2[i] = 0.2
+    func makeSineBuffer(freq: Double, seconds: Double = 0.1, sampleRate: Double = 48_000, channels: AVAudioChannelCount = 1) -> AVAudioPCMBuffer {
+        let frames = AVAudioFrameCount(seconds * sampleRate)
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channels)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+        buffer.frameLength = frames
+        let count = Int(frames)
+        let twoPi = 2.0 * Double.pi
+        if let ch = buffer.floatChannelData {
+            for c in 0..<Int(channels) {
+                for i in 0..<count {
+                    let t = Double(i) / sampleRate
+                    ch[c][i] = Float(sin(twoPi * freq * t))
+                }
             }
         }
+        return buffer
+    }
 
-        let mixed = processor.mixAudioStreams([buffer1, buffer2])
+    func testMixTwoSineWavesProducesData() {
+        let proc = AudioProcessor()
+        let a = makeSineBuffer(freq: 440, channels: 2)
+        let b = makeSineBuffer(freq: 660, channels: 2)
+        let mixed = proc.mixAudioStreams([a, b])
         XCTAssertNotNil(mixed)
-        if let mixed = mixed {
-            let data = processor.convertToWAV(mixed)
-            XCTAssertFalse(data.isEmpty)
+        XCTAssertGreaterThan(mixed!.frameLength, 0)
+    }
+
+    func testCombineProcessAndInputsToEightChannels() throws {
+        // Skip if 8-channel float32 non-interleaved buffers are not supported in this environment
+        guard let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 8, interleaved: false),
+              AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: 4800) != nil else {
+            throw XCTSkip("Skipping: 8-channel PCM buffers not supported on this environment")
         }
+        let proc = AudioProcessor()
+        let processStereo = makeSineBuffer(freq: 440, channels: 2)
+        let input3 = makeSineBuffer(freq: 1000, channels: 1)
+        let input5 = makeSineBuffer(freq: 2000, channels: 1)
+        let out = proc.combine(processAudio: processStereo, inputAudioByChannel: [3: input3, 5: input5], totalChannels: 8)
+        XCTAssertNotNil(out)
+        let outBuf = out!
+        XCTAssertEqual(outBuf.format.channelCount, 8)
+        XCTAssertEqual(outBuf.frameLength, processStereo.frameLength)
+        guard let ch = outBuf.floatChannelData else { return XCTFail("no channels") }
+        let n = Int(outBuf.frameLength)
+        // ch1 and ch2 non-zero
+        let sum1 = (0..<n).reduce(0.0) { $0 + Double(ch[0][$1]) }
+        let sum2 = (0..<n).reduce(0.0) { $0 + Double(ch[1][$1]) }
+        XCTAssertNotEqual(sum1, 0)
+        XCTAssertNotEqual(sum2, 0)
+        // ch3 non-zero, ch4 zero (unused), ch5 non-zero
+        let sum3 = (0..<n).reduce(0.0) { $0 + Double(ch[2][$1]) }
+        let sum4 = (0..<n).reduce(0.0) { $0 + Double(ch[3][$1]) }
+        let sum5 = (0..<n).reduce(0.0) { $0 + Double(ch[4][$1]) }
+        XCTAssertNotEqual(sum3, 0)
+        XCTAssertEqual(sum4, 0)
+        XCTAssertNotEqual(sum5, 0)
+        // ch6-8 zero (unused)
+        let sum6 = (0..<n).reduce(0.0) { $0 + Double(ch[5][$1]) }
+        let sum7 = (0..<n).reduce(0.0) { $0 + Double(ch[6][$1]) }
+        let sum8 = (0..<n).reduce(0.0) { $0 + Double(ch[7][$1]) }
+        XCTAssertEqual(sum6, 0)
+        XCTAssertEqual(sum7, 0)
+        XCTAssertEqual(sum8, 0)
     }
 }

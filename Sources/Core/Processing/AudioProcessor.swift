@@ -114,6 +114,50 @@ public final class AudioProcessor: AudioProcessorProtocol {
         }
     }
 
+    public func combine(processAudio: AVAudioPCMBuffer, inputAudioByChannel: [Int: AVAudioPCMBuffer], totalChannels: Int) -> AVAudioPCMBuffer? {
+        guard totalChannels >= 2 else { return nil }
+        let sampleRate = processAudio.format.sampleRate
+
+        var format: AVAudioFormat?
+        if let layout = AVAudioChannelLayout(layoutTag: kAudioChannelLayoutTag_DiscreteInOrder | (UInt32(totalChannels) << 16)) {
+            format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, interleaved: false, channelLayout: layout)
+        }
+        if format == nil {
+            format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: AVAudioChannelCount(totalChannels), interleaved: false)
+        }
+        guard let fmt = format else { return nil }
+
+        let frames = processAudio.frameLength
+        guard let out = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frames) else { return nil }
+        out.frameLength = frames
+        guard let outCh = out.floatChannelData else { return nil }
+
+        let framesInt = Int(frames)
+        for c in 0..<totalChannels {
+            memset(outCh[c], 0, framesInt * MemoryLayout<Float>.size)
+        }
+
+        if let procCh = processAudio.floatChannelData {
+            let count = min(framesInt, Int(processAudio.frameLength))
+            memcpy(outCh[0], procCh[0], count * MemoryLayout<Float>.size)
+            if processAudio.format.channelCount >= 2 {
+                memcpy(outCh[1], procCh[1], count * MemoryLayout<Float>.size)
+            } else {
+                memcpy(outCh[1], procCh[0], count * MemoryLayout<Float>.size)
+            }
+        }
+
+        for (channel, buffer) in inputAudioByChannel {
+            guard channel >= 3, channel <= totalChannels else { continue }
+            let idx = channel - 1
+            guard let src = buffer.floatChannelData else { continue }
+            let count = min(framesInt, Int(buffer.frameLength))
+            memcpy(outCh[idx], src[0], count * MemoryLayout<Float>.size)
+        }
+
+        return out
+    }
+
     private func bufferDuration(_ buffer: AVAudioPCMBuffer) -> TimeInterval {
         return TimeInterval(buffer.frameLength) / buffer.format.sampleRate
     }
