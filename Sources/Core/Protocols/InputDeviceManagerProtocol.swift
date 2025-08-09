@@ -17,6 +17,13 @@ public protocol InputDeviceManagerProtocol: AnyObject {
     func currentChannelAssignments() -> [Int: AudioInputDevice]
 }
 
+public enum AudioDeviceType: Equatable, Hashable {
+    case physical
+    case aggregate
+    case virtual
+    case unknown
+}
+
 public struct AudioInputDevice: Equatable, Hashable {
     public let uid: String
     public let name: String
@@ -24,13 +31,17 @@ public struct AudioInputDevice: Equatable, Hashable {
     public let sampleRate: Double
     public var assignedChannel: Int?
     public var isConnected: Bool
+    public var deviceType: AudioDeviceType
+    public var manufacturer: String?
 
-    public init(uid: String, name: String, channelCount: Int, sampleRate: Double, assignedChannel: Int? = nil, isConnected: Bool = true) {
+    public init(uid: String, name: String, channelCount: Int, sampleRate: Double, assignedChannel: Int? = nil, isConnected: Bool = true, deviceType: AudioDeviceType = .unknown, manufacturer: String? = nil) {
         self.uid = uid
         self.name = name
         self.channelCount = channelCount
         self.sampleRate = sampleRate
         self.assignedChannel = assignedChannel
         self.isConnected = isConnected
+        self.deviceType = deviceType
+        self.manufacturer = manufacturer
     }
 }

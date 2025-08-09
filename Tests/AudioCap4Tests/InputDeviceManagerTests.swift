@@ -61,6 +61,22 @@ final class InputDeviceManagerTests: XCTestCase {
         XCTAssertEqual(Set(newAssigned).count, newAssigned.count) // unique channels
     }
 
+    func testManufacturerKeywordFilteringExcludesAggregateAndVirtual() {
+        let manager = InputDeviceManager()
+        let devices = [
+            AudioInputDevice(uid: "phys", name: "Mic A", channelCount: 1, sampleRate: 48_000, isConnected: true, deviceType: .unknown, manufacturer: "Acme Inc."),
+            AudioInputDevice(uid: "agg", name: "Agg Dev", channelCount: 1, sampleRate: 48_000, isConnected: true, deviceType: .unknown, manufacturer: "Aggregate Device"),
+            AudioInputDevice(uid: "virt", name: "Virt Dev", channelCount: 1, sampleRate: 48_000, isConnected: true, deviceType: .unknown, manufacturer: "Virtual Audio")
+        ]
+        // Use assignChannels(for:) as a proxy to invoke internal filtering via manager state update
+        // by directly applying the filter for test purposes using a helper in tests-only extension
+        let filtered = manager.__test_filterAggregateAndVirtualDevices(devices)
+        let uids = Set(filtered.map { $0.uid })
+        XCTAssertTrue(uids.contains("phys"))
+        XCTAssertFalse(uids.contains("agg"))
+        XCTAssertFalse(uids.contains("virt"))
+    }
+
     func testReconnectRestoresPreviousChannelWhenAvailable() {
         let manager = InputDeviceManager()
         // Initial set assigns channels 3 and 4
@@ -88,5 +104,12 @@ final class InputDeviceManagerTests: XCTestCase {
         let chY3 = third.first { $0.uid == "Y" }!.assignedChannel!
         XCTAssertEqual(chX3, chX1)
         XCTAssertEqual(chY3, chY1)
+    }
+}
+
+// Tests-only exposure of filtering helper
+extension InputDeviceManager {
+    func __test_filterAggregateAndVirtualDevices(_ devices: [AudioInputDevice]) -> [AudioInputDevice] {
+        return filterAggregateAndVirtualDevices(devices)
     }
 }

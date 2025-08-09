@@ -14,17 +14,17 @@ graph TB
     CLI --> AC[Audio Capturer]
     CLI --> IDM[Input Device Manager]
     CLI --> FC[File Controller]
-    
+
     PM --> |Process Discovery| SC[System Calls]
     AC --> |Audio Capture| SCK[ScreenCaptureKit]
     IDM --> |Input Devices| AVF[AVFoundation]
     AC --> |Audio Processing| AP[Audio Processor]
     IDM --> |Input Audio| AP
     AP --> |8-Channel Audio| FC
-    
+
     FC --> |WAV Files| FS[File System]
     FC --> |Channel Mapping| FS
-    
+
     PM --> |Process Events| AC
     IDM --> |Device Events| AP
     AC --> |Recording Status| CLI
@@ -45,29 +45,32 @@ graph TB
 ### 1. CLI Interface (`AudioRecorderCLI`)
 
 **Responsibilities:**
+
 - Parse command-line arguments using Swift ArgumentParser
 - Validate input parameters and permissions
 - Coordinate application lifecycle
 - Display real-time recording feedback
 
 **Key Properties:**
+
 ```swift
 struct AudioRecorderCLI: ParsableCommand {
     @Argument(help: "Regular expression to match process names")
     var processRegex: String
-    
+
     @Option(name: .shortAndLong, help: "Output directory for recordings")
     var outputDirectory: String?
-    
+
     @Flag(name: .shortAndLong, help: "Enable verbose logging")
     var verbose: Bool = false
-    
+
     @Flag(name: .shortAndLong, help: "Capture all audio input devices in addition to process audio")
     var captureInputs: Bool = false
 }
 ```
 
 **Interfaces:**
+
 - `ProcessManagerDelegate` - Receives process discovery updates
 - `AudioCapturerDelegate` - Receives recording status and duration updates
 - `InputDeviceManagerDelegate` - Receives input device connection/disconnection events
@@ -75,12 +78,14 @@ struct AudioRecorderCLI: ParsableCommand {
 ### 2. Process Manager (`ProcessManager`)
 
 **Responsibilities:**
+
 - Discover running processes using macOS system APIs
 - Filter processes using regex matching against executable names and paths
 - Monitor process lifecycle (start/stop events)
 - Provide process metadata for audio correlation
 
 **Key Methods:**
+
 ```swift
 class ProcessManager {
     func discoverProcesses(matching regex: String) -> [ProcessInfo]
@@ -97,6 +102,7 @@ struct ProcessInfo {
 ```
 
 **Implementation Details:**
+
 - Uses `NSRunningApplication` for high-level process discovery
 - Falls back to `sysctl` system calls for comprehensive process enumeration
 - Implements regex matching using `NSRegularExpression`
@@ -105,6 +111,7 @@ struct ProcessInfo {
 ### 3. Input Device Manager (`InputDeviceManager`)
 
 **Responsibilities:**
+
 - Enumerate all available audio input devices using AVFoundation
 - Monitor device connection/disconnection events (hot-swapping)
 - Manage audio capture from up to 6 input devices simultaneously
@@ -112,12 +119,15 @@ struct ProcessInfo {
 - Handle device-specific audio format configuration
 
 **Key Methods:**
+
 ```swift
 class InputDeviceManager {
     func enumerateInputDevices() -> [AudioInputDevice]
     func startCapturing(devices: [AudioInputDevice], delegate: InputDeviceManagerDelegate)
     func stopCapturing()
     func handleDeviceConnectionChange(_ notification: Notification)
+    private func isPhysicalInputDevice(_ deviceID: AudioDeviceID) -> Bool
+    private func filterAggregateAndVirtualDevices(_ devices: [AudioInputDevice]) -> [AudioInputDevice]
 }
 
 struct AudioInputDevice {
@@ -126,8 +136,16 @@ struct AudioInputDevice {
     let uid: String
     let channelCount: Int
     let sampleRate: Double
+    let deviceType: AudioDeviceType
     var assignedChannel: Int?
     var isConnected: Bool
+}
+
+enum AudioDeviceType {
+    case physical
+    case aggregate
+    case virtual
+    case unknown
 }
 
 protocol InputDeviceManagerDelegate: AnyObject {
@@ -138,21 +156,34 @@ protocol InputDeviceManagerDelegate: AnyObject {
 ```
 
 **Implementation Details:**
+
 - Uses `AVAudioSession` and `AVAudioEngine` for input device management
 - Monitors `AVAudioSession.routeChangeNotification` for device hot-swapping
 - Implements channel assignment logic (channels 3-8 for input devices)
 - Handles device-specific sample rate conversion to match 48kHz output
 - Manages device reconnection and channel reassignment
+- Filters out aggregate and virtual audio devices using Core Audio device type detection
+
+**Device Filtering Strategy:**
+
+- Uses Core Audio's `AudioObjectGetPropertyData` with `kAudioDevicePropertyDeviceManufacturerCFString` and `kAudioDevicePropertyTransportType` to identify device types
+- Excludes devices with transport type `kAudioDeviceTransportTypeAggregate`
+- Excludes devices with transport type `kAudioDeviceTransportTypeVirtual`
+- Excludes devices where manufacturer contains "Aggregate" or "Virtual" keywords
+- Maintains a filtered device list that only includes physical hardware devices (USB, built-in, Bluetooth, etc.)
+- Logs excluded devices with their type and reason for debugging purposes
 
 ### 4. Audio Capturer (`AudioCapturer`)
 
 **Responsibilities:**
+
 - Configure and manage ScreenCaptureKit audio capture
 - Correlate captured audio with target process activity
 - Handle audio permissions and error states
 - Provide real-time recording feedback
 
 **Key Methods:**
+
 ```swift
 class AudioCapturer: SCStreamDelegate {
     func startCapture(for processes: [ProcessInfo]) throws
@@ -162,6 +193,7 @@ class AudioCapturer: SCStreamDelegate {
 ```
 
 **ScreenCaptureKit Configuration:**
+
 ```swift
 let streamConfig = SCStreamConfiguration()
 streamConfig.capturesAudio = true
@@ -171,6 +203,7 @@ streamConfig.excludesCurrentProcessAudio = true
 ```
 
 **Audio Correlation Strategy:**
+
 - Capture all system audio via ScreenCaptureKit
 - Monitor process CPU/memory usage to detect audio activity
 - Use audio level analysis to identify when target processes are generating sound
@@ -179,6 +212,7 @@ streamConfig.excludesCurrentProcessAudio = true
 ### 5. Audio Processor (`AudioProcessor`)
 
 **Responsibilities:**
+
 - Process raw audio sample buffers from ScreenCaptureKit
 - Filter audio based on process correlation data
 - Mix multiple process audio streams
@@ -186,6 +220,7 @@ streamConfig.excludesCurrentProcessAudio = true
 - Convert multi-channel audio to WAV format for file output
 
 **Key Methods:**
+
 ```swift
 class AudioProcessor {
     func processAudioBuffer(_ buffer: CMSampleBuffer, from processes: [ProcessInfo]) -> AVAudioPCMBuffer?
@@ -196,6 +231,7 @@ class AudioProcessor {
 ```
 
 **8-Channel Audio Processing Pipeline:**
+
 1. Convert CMSampleBuffer to AVAudioPCMBuffer (process audio)
 2. Apply process-based filtering using correlation data
 3. Mix audio from multiple target processes (channels 1-2)
@@ -205,6 +241,7 @@ class AudioProcessor {
 7. Convert to 8-channel WAV format using Core Audio services
 
 **Channel Assignment:**
+
 - Channels 1-2: Process audio (stereo mix of target processes)
 - Channels 3-8: Input devices (up to 6 devices, one per channel)
 - Unused channels: Silent (zero-filled)
@@ -212,6 +249,7 @@ class AudioProcessor {
 ### 6. File Controller (`FileController`)
 
 **Responsibilities:**
+
 - Manage output directory creation and permissions
 - Generate timestamped filenames for audio and mapping files
 - Write 8-channel WAV data to files
@@ -219,6 +257,7 @@ class AudioProcessor {
 - Handle file system errors and disk space monitoring
 
 **Key Methods:**
+
 ```swift
 class FileController {
     func createOutputDirectory(_ path: String) throws
@@ -240,7 +279,7 @@ struct DeviceEvent {
     let device: AudioInputDevice
     let event: EventType
     let channel: Int?
-    
+
     enum EventType {
         case connected
         case disconnected
@@ -250,6 +289,7 @@ struct DeviceEvent {
 ```
 
 **File Naming Convention:**
+
 - Audio files: `yyyy-MM-dd-HH-mm-ss.wav` (8-channel WAV)
 - Channel mapping: `yyyy-MM-dd-HH-mm-ss-channels.json`
 - Default location: `~/Documents/audiocap/`
@@ -258,6 +298,7 @@ struct DeviceEvent {
 ## Data Models
 
 ### Process Information Model
+
 ```swift
 struct ProcessInfo: Codable {
     let pid: pid_t
@@ -278,6 +319,7 @@ enum AudioActivityLevel {
 ```
 
 ### Recording Session Model
+
 ```swift
 struct RecordingSession {
     let sessionId: UUID
@@ -291,6 +333,7 @@ struct RecordingSession {
 ```
 
 ### Audio Configuration Model
+
 ```swift
 struct AudioConfiguration {
     let sampleRate: Int = 48000
@@ -307,6 +350,7 @@ struct AudioConfiguration {
 ## Error Handling
 
 ### Error Types
+
 ```swift
 enum AudioRecorderError: LocalizedError {
     case permissionDenied(PermissionType)
@@ -316,24 +360,27 @@ enum AudioRecorderError: LocalizedError {
     case fileSystemError(Error)
     case invalidRegex(String)
     case configurationError(String)
-    
+
     enum PermissionType {
         case screenRecording
         case microphone
         case fileSystem
         case accessibility
     }
-    
+
     enum InputDeviceError {
         case deviceNotFound(String)
         case deviceUnavailable(String)
         case formatNotSupported(String)
         case channelLimitExceeded(Int)
+        case deviceFilteringFailed(String)
+        case noPhysicalDevicesAvailable
     }
 }
 ```
 
 ### Error Handling Strategy
+
 - **Permission Errors**: Display step-by-step instructions for enabling required permissions
 - **Process Errors**: Log warnings but continue with remaining processes
 - **Audio Errors**: Attempt recovery with fallback configurations
@@ -341,6 +388,7 @@ enum AudioRecorderError: LocalizedError {
 - **Graceful Degradation**: Continue operation with reduced functionality when possible
 
 ### Permission Management
+
 ```swift
 class PermissionManager {
     func checkScreenRecordingPermission() -> Bool
@@ -352,13 +400,15 @@ class PermissionManager {
 ## Testing Strategy
 
 ### Unit Testing
+
 - **Process Discovery**: Mock system APIs to test regex matching and process filtering
 - **Audio Processing**: Test audio buffer manipulation and 8-channel WAV conversion with sample data
-- **Input Device Management**: Test device enumeration, hot-swapping, and channel assignment
+- **Input Device Management**: Test device enumeration, device filtering (aggregate/virtual exclusion), hot-swapping, and channel assignment
 - **File Operations**: Test directory creation, file naming, channel mapping logs, and error handling
 - **CLI Parsing**: Test argument validation, help text generation, and new --capture-inputs flag
 
 ### Integration Testing
+
 - **ScreenCaptureKit Integration**: Test audio capture with mock audio sources
 - **Input Device Integration**: Test multi-device capture and hot-swapping scenarios
 - **Process Monitoring**: Test process lifecycle events and correlation
@@ -366,12 +416,16 @@ class PermissionManager {
 - **End-to-End Workflows**: Test complete recording sessions with simulated processes and input devices
 
 ### Testing Framework
+
 ```swift
 // Using XCTest for unit and integration tests
 class AudioRecorderTests: XCTestCase {
     func testProcessDiscovery()
     func testAudioCapture()
     func testInputDeviceManagement()
+    func testDeviceFiltering()
+    func testAggregateDeviceExclusion()
+    func testVirtualDeviceExclusion()
     func testMultiChannelAudioProcessing()
     func testChannelMappingLogs()
     func testDeviceHotSwapping()
@@ -387,6 +441,7 @@ class MockFileController: FileControllerProtocol
 ```
 
 ### Performance Testing
+
 - **Memory Usage**: Monitor memory consumption during long recording sessions
 - **CPU Impact**: Measure CPU usage of audio processing and correlation
 - **File I/O Performance**: Test write performance with large audio files
@@ -395,6 +450,7 @@ class MockFileController: FileControllerProtocol
 ## Implementation Notes
 
 ### macOS-Specific Considerations
+
 - **ScreenCaptureKit Requirements**: Requires macOS 12.3+ (Sequoia 15.6 fully supported)
 - **Privacy Permissions**: Screen Recording permission required for ScreenCaptureKit, Microphone permission required for input device access
 - **Audio Unit Integration**: Uses AVAudioEngine and Audio Units for input device management
@@ -403,6 +459,7 @@ class MockFileController: FileControllerProtocol
 - **Process Access**: Some system processes may be protected from enumeration
 
 ### Performance Optimizations
+
 - **Audio Buffer Management**: Use circular buffers to minimize memory allocation for 8-channel audio processing
 - **Multi-Device Synchronization**: Implement buffer alignment and timestamp correlation for input devices
 - **Process Monitoring**: Implement efficient polling intervals to balance accuracy and performance
@@ -411,12 +468,14 @@ class MockFileController: FileControllerProtocol
 - **Channel Assignment**: Optimize channel mapping algorithms for minimal latency during device hot-swapping
 
 ### Swift-Specific Implementation Details
+
 - **Concurrency**: Use Swift's async/await for audio processing pipelines
 - **Memory Safety**: Leverage Swift's automatic reference counting and memory safety
 - **Error Handling**: Use Swift's Result type and throwing functions for robust error management
 - **Protocol-Oriented Design**: Define protocols for all major components to enable testing and modularity
 
 ### Dependencies
+
 - **ScreenCaptureKit**: System framework for system audio capture
 - **AVFoundation**: Audio processing, input device management, and format conversion
 - **AudioToolbox**: Core Audio services for multi-channel WAV file creation

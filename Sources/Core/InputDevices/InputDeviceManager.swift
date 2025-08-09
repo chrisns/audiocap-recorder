@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import CoreAudio
 
 final class InputDeviceManager: InputDeviceManagerProtocol {
     weak var delegate: InputDeviceManagerDelegate?
@@ -15,16 +16,20 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
     func enumerateInputDevices() -> [AudioInputDevice] {
         let devices = AVCaptureDevice.devices(for: .audio)
         let mapped: [AudioInputDevice] = devices.map { device in
-            AudioInputDevice(
+            var dev = AudioInputDevice(
                 uid: device.uniqueID,
                 name: device.localizedName,
                 channelCount: 1,
                 sampleRate: 48_000,
                 assignedChannel: channelByUID[device.uniqueID],
-                isConnected: true
+                isConnected: true,
+                deviceType: detectDeviceType(forUID: device.uniqueID),
+                manufacturer: fetchManufacturer(forUID: device.uniqueID)
             )
+            return dev
         }
-        for dev in mapped { connectedDevicesByUID[dev.uid] = dev }
+        let filtered = filterAggregateAndVirtualDevices(mapped)
+        for dev in filtered { connectedDevicesByUID[dev.uid] = dev }
         let updated = assignChannels(for: Array(connectedDevicesByUID.values))
         return updated
     }
@@ -34,14 +39,21 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
         let conn = center.addObserver(forName: .AVCaptureDeviceWasConnected, object: nil, queue: .main) { [weak self] note in
             guard let self else { return }
             guard let device = note.object as? AVCaptureDevice, device.hasMediaType(.audio) else { return }
-            let audioDev = AudioInputDevice(
+            var audioDev = AudioInputDevice(
                 uid: device.uniqueID,
                 name: device.localizedName,
                 channelCount: 1,
                 sampleRate: 48_000,
                 assignedChannel: nil,
-                isConnected: true
+                isConnected: true,
+                deviceType: self.detectDeviceType(forUID: device.uniqueID),
+                manufacturer: self.fetchManufacturer(forUID: device.uniqueID)
             )
+            // Exclude aggregate/virtual
+            if !isPhysicalInputDevice(audioDev) {
+                print("Excluding device: \(audioDev.name) [uid=\(audioDev.uid)] type=\(audioDev.deviceType)")
+                return
+            }
             self.connectedDevicesByUID[audioDev.uid] = audioDev
             let updated = self.assignChannels(for: Array(self.connectedDevicesByUID.values))
             if let assigned = updated.first(where: { $0.uid == audioDev.uid })?.assignedChannel {
@@ -59,7 +71,7 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
             self.stopCapture(forUID: uid)
             _ = self.assignChannels(for: Array(self.connectedDevicesByUID.values))
             if let chan = previousChannel {
-                let dev = AudioInputDevice(uid: uid, name: device.localizedName, channelCount: 1, sampleRate: 48_000, assignedChannel: nil, isConnected: false)
+                let dev = AudioInputDevice(uid: uid, name: device.localizedName, channelCount: 1, sampleRate: 48_000, assignedChannel: nil, isConnected: false, deviceType: .unknown, manufacturer: nil)
                 self.delegate?.deviceDisconnected(dev, fromChannel: chan)
             }
         }
@@ -93,6 +105,115 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
     }
 }
 
+// MARK: - Filtering and type detection
+extension InputDeviceManager {
+    func isPhysicalInputDevice(_ device: AudioInputDevice) -> Bool {
+        return device.deviceType == .physical
+    }
+
+    func filterAggregateAndVirtualDevices(_ devices: [AudioInputDevice]) -> [AudioInputDevice] {
+        var included: [AudioInputDevice] = []
+        for dev in devices {
+            switch dev.deviceType {
+            case .aggregate:
+                print("Excluding aggregate device: \(dev.name) [uid=\(dev.uid)]")
+            case .virtual:
+                print("Excluding virtual device: \(dev.name) [uid=\(dev.uid)]")
+            case .unknown:
+                if let mfg = dev.manufacturer?.lowercased(), mfg.contains("aggregate") || mfg.contains("virtual") {
+                    print("Excluding device by manufacturer keyword: \(dev.name) [uid=\(dev.uid)] mfg=\(mfg)")
+                    continue
+                }
+                included.append(dev)
+            case .physical:
+                included.append(dev)
+            }
+        }
+        return included
+    }
+
+    func detectDeviceType(forUID uid: String) -> AudioDeviceType {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID = audioDeviceID(forUID: uid)
+        guard deviceID != kAudioObjectUnknown else { return .unknown }
+        var transportType: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transportType)
+        if status != noErr { return .unknown }
+        switch transportType {
+        case kAudioDeviceTransportTypeAggregate:
+            return .aggregate
+        case kAudioDeviceTransportTypeVirtual:
+            return .virtual
+        default:
+            return .physical
+        }
+    }
+
+    func fetchManufacturer(forUID uid: String) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyManufacturer,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID = audioDeviceID(forUID: uid)
+        guard deviceID != kAudioObjectUnknown else { return nil }
+        var size = UInt32(0)
+        var status = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
+        if status != noErr || size == 0 { return nil }
+        let buffer = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: 1)
+        defer { buffer.deallocate() }
+        status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, buffer)
+        if status != noErr { return nil }
+        let cfstr = buffer.bindMemory(to: CFString.self, capacity: 1).pointee
+        return cfstr as String
+    }
+
+    func audioDeviceID(forUID uid: String) -> AudioObjectID {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size)
+        if status != noErr || size == 0 { return kAudioObjectUnknown }
+        let count = Int(size) / MemoryLayout<AudioObjectID>.size
+        let buffer = UnsafeMutablePointer<AudioObjectID>.allocate(capacity: count)
+        defer { buffer.deallocate() }
+        status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, buffer)
+        if status != noErr { return kAudioObjectUnknown }
+        let devices = Array(UnsafeBufferPointer(start: buffer, count: count))
+        for dev in devices {
+            if let cfuid = copyDeviceUID(dev) as String?, cfuid == uid {
+                return dev
+            }
+        }
+        return kAudioObjectUnknown
+    }
+
+    func copyDeviceUID(_ deviceID: AudioObjectID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size = UInt32(0)
+        var status = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
+        if status != noErr || size == 0 { return nil }
+        let buffer = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: 1)
+        defer { buffer.deallocate() }
+        status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, buffer)
+        if status != noErr { return nil }
+        let cfstr = buffer.bindMemory(to: CFString.self, capacity: 1).pointee
+        return cfstr as String
+    }
+}
+
 // MARK: - Channel assignment (3-8)
 extension InputDeviceManager {
     func assignChannels(for devices: [AudioInputDevice]) -> [AudioInputDevice] {
@@ -102,7 +223,6 @@ extension InputDeviceManager {
         let availableChannels = Array(3...8)
         var usedChannels = Set(channelByUID.values)
 
-        // Try to restore previous channels for devices without a current assignment
         let unassignedUIDs = devices
             .map { $0.uid }
             .filter { channelByUID[$0] == nil }

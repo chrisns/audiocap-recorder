@@ -161,3 +161,14 @@ This feature involves creating a command-line macOS application that can record 
 2. WHEN device changes occur during recording THEN the system SHALL update and display the current channel mapping
 3. WHEN recording completes THEN the system SHALL save a channel mapping log file alongside the WAV file with device assignments and timing information
 4. WHEN no input devices are available THEN the system SHALL clearly indicate that only process audio (channels 1-2) will be recorded
+
+### Requirement 15
+
+**User Story:** As a user, I want the system to filter out aggregate and virtual audio interfaces during input device enumeration, so that I only capture from physical audio input devices and avoid potential audio routing issues or duplicate captures.
+
+#### Acceptance Criteria
+
+1. WHEN enumerating audio input devices THEN the system SHALL exclude aggregate audio devices from the available device list
+2. WHEN enumerating audio input devices THEN the system SHALL exclude virtual audio interfaces (such as software-created devices) from the available device list
+3. WHEN filtering devices THEN the system SHALL only include physical audio input devices such as built-in microphones, USB audio interfaces, and hardware-based audio devices
+4. WHEN aggregate or virtual devices are detected THEN the system SHALL log their exclusion for debugging purposes but not display them to the user

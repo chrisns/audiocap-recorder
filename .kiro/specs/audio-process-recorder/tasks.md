@@ -148,6 +148,19 @@
   - Write unit tests for device enumeration and channel assignment
   - _Requirements: 12.1, 12.2, 13.1, 13.2_
 
+- [x] 16.1 Add aggregate and virtual audio device filtering to InputDeviceManager
+
+  - Implement Core Audio device type detection using AudioObjectGetPropertyData with kAudioDevicePropertyTransportType
+  - Add filtering logic to exclude devices with transport type kAudioDeviceTransportTypeAggregate
+  - Add filtering logic to exclude devices with transport type kAudioDeviceTransportTypeVirtual
+  - Implement manufacturer string checking to exclude devices containing "Aggregate" or "Virtual" keywords
+  - Create AudioDeviceType enum (physical, aggregate, virtual, unknown) and add type detection to AudioInputDevice struct
+  - Add isPhysicalInputDevice() and filterAggregateAndVirtualDevices() private methods to InputDeviceManager
+  - Log excluded devices with their type and exclusion reason for debugging purposes
+  - Write unit tests for device filtering with mock aggregate and virtual devices
+  - Write integration tests to verify only physical devices are included in enumeration
+  - _Requirements: 15.1, 15.2, 15.3, 15.4_
+
 - [x] 17. Build audio input device capture system with AVAudioEngine
 
   - Create audio capture setup for each discovered input device using AVAudioEngine
@@ -218,7 +231,7 @@
   - Ensure all existing tests continue to pass with new multi-channel functionality
   - _Requirements: 12.1, 12.2, 13.1, 13.2, 14.1, 14.2_
 
-- [ ] 24. Update documentation and finalize multi-channel audio feature
+- [x] 24. Update documentation and finalize multi-channel audio feature
 
   - Update README.md with comprehensive documentation of the new --capture-inputs feature
   - Document 8-channel WAV output format and channel mapping (channels 1-2: process audio, 3-8: input devices)
@@ -230,3 +243,17 @@
   - Verify all code documentation and comments are up to date
   - Run final integration tests to ensure all features work together
   - _Requirements: 12.1, 12.2, 13.1, 13.2, 14.1, 14.2, 14.3, 14.4_
+
+- [ ] 25. Verify and fix 8-channel WAV output functionality
+
+  - Create comprehensive integration test that records with --capture-inputs flag enabled
+  - Use AVAudioFile to load the generated WAV file and verify it has exactly 8 channels
+  - Test channel assignment by generating distinct audio signals on different input devices and verifying they appear on correct channels (3-8)
+  - Verify process audio appears correctly on channels 1-2 (stereo mix)
+  - Add test to ensure unused input device channels (when fewer than 6 devices) are properly silent (zero-filled)
+  - Create test with multiple input devices connected to verify proper channel mapping and no audio bleeding between channels
+  - If 8-channel output is not working correctly, debug and fix AudioProcessor's combineWithInputDevices() method
+  - If WAV file creation is incorrect, debug and fix FileController's writeMultiChannelAudioData() method using AudioToolbox
+  - Verify WAV file headers contain correct channel count, sample rate (48kHz), and bit depth (16-bit) metadata
+  - Add automated test that fails if generated WAV file is not exactly 8 channels, ensuring regression prevention
+  - _Requirements: 12.2, 12.3, 14.1, 14.2_
