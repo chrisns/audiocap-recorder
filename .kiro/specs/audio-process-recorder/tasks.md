@@ -188,7 +188,7 @@
   - Write unit tests for 8-channel WAV creation and channel mapping file generation
   - _Requirements: 12.2, 14.2, 14.3, 14.4_
 
-- [ ] 21. Add microphone permission handling and user guidance
+- [x] 21. Add microphone permission handling and user guidance
 
   - Implement microphone permission checking using AVAudioSession authorization
   - Add permission request flow for microphone access when --capture-inputs is used

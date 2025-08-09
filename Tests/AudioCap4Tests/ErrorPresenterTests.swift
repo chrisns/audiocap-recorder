@@ -13,4 +13,10 @@ final class ErrorPresenterTests: XCTestCase {
         let msg = presenter.present(.invalidRegex("["))
         XCTAssertTrue(msg.contains("Invalid regex pattern"))
     }
+
+    func testMicrophonePermissionMessage() {
+        let presenter = ErrorPresenter()
+        let msg = presenter.present(.permissionDenied(.microphone))
+        XCTAssertTrue(msg.contains("Microphone permission"))
+    }
 }
