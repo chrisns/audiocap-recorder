@@ -114,3 +114,16 @@
   - Create and write WAV files continuously with a reasonable file size
   - Verify end-to-end by recording Chrome for ~10–15s, confirm file exists in `~/Documents/audiocap/`, size is reasonable, and RMS amplitude > 0
   - Run all tests and ensure they pass
+
+- [x] 14. Automated test: spawn sinewave process, capture, and verify size and frequency
+
+  - Create a lightweight helper executable target `SineWavePlayer` that plays a pure sine tone (default 1 kHz) to the system output using `AVAudioEngine`
+  - Add an integration test `SineCaptureTests` that:
+    - Builds and launches `SineWavePlayer` as a separate process
+    - Runs `audiocap-recorder` targeting the helper process via regex (e.g., `(?i)SineWavePlayer`), outputting to a temporary directory
+    - Records for a fixed duration (e.g., 5 seconds), then sends SIGINT to stop
+    - Locates the produced WAV file and asserts size is within ±20% of expected bytes (48 kHz × 2ch × 4 bytes × duration)
+    - Loads the WAV via `AVAudioFile` and performs frequency analysis (FFT or autocorrelation) to detect a dominant tone near 1 kHz (±50 Hz)
+  - Ensure the test is marked as integration-only and can be skipped on CI if permissions are unavailable (but runnable locally)
+  - Update `Package.swift` to include the new helper target and the integration test
+  - All existing tests must continue to pass

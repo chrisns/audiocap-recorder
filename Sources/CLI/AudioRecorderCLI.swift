@@ -54,12 +54,17 @@ public struct AudioRecorderCLI: ParsableCommand {
         }
 
         if processes.isEmpty {
-            let err = AudioRecorderError.processNotFound(processRegex)
-            logger.error(errorPresenter.present(err))
-            throw CleanExit.message(err.localizedDescription)
+            let skip = ProcessInfo.processInfo.environment["AUDIOCAP_SKIP_PROCESS_CHECK"] == "1"
+            if !skip {
+                let err = AudioRecorderError.processNotFound(processRegex)
+                logger.error(errorPresenter.present(err))
+                throw CleanExit.message(err.localizedDescription)
+            } else {
+                logger.warn("No matching processes found. Proceeding due to AUDIOCAP_SKIP_PROCESS_CHECK=1.")
+            }
         }
 
-        var capturer = AudioCapturer(permissionManager: permissionManager)
+        let capturer = AudioCapturer(permissionManager: permissionManager)
         capturer.setOutputDirectory(outputDirectory)
 
         let shutdown = ShutdownCoordinator(audioCapturer: capturer, fileController: FileController())
