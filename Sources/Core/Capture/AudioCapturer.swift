@@ -8,6 +8,7 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     private let permissionManager: PermissionManaging
     private var stream: SCStream?
     private let sampleQueue = DispatchQueue(label: "audio.capturer.samples")
+    private var recordingTimer: RecordingTimer?
 
     public init(permissionManager: PermissionManaging = PermissionManager()) {
         self.permissionManager = permissionManager
@@ -39,9 +40,22 @@ extension AudioCapturer {
         try await stream.startCapture()
         self.stream = stream
         delegate?.didStartRecording()
+
+        // Start duration updates with 12-hour max as per requirements
+        let maxSeconds = 12 * 60 * 60
+        let timer = RecordingTimer(queue: .main, tickInterval: 1.0, maxDurationSeconds: maxSeconds)
+        timer.start(onTick: { [weak self] seconds in
+            self?.delegate?.didUpdateRecordingDuration(seconds: seconds)
+        }, onCompleted: { [weak self] in
+            self?.stopCapture()
+        })
+        self.recordingTimer = timer
     }
 
     public func stopCapture() {
+        recordingTimer?.stop()
+        recordingTimer = nil
+
         guard let stream = stream else { return }
         stream.stopCapture { [weak self] error in
             if let error = error {
@@ -55,7 +69,6 @@ extension AudioCapturer {
 extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
     public func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
         guard outputType == .audio else { return }
-        // Future tasks will process audio.
     }
 
     public func stream(_ stream: SCStream, didStopWithError error: Error) {
