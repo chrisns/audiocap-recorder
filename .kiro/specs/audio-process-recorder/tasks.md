@@ -158,7 +158,7 @@
   - Write integration tests for multi-device audio capture
   - _Requirements: 12.1, 12.2, 12.3_
 
-- [ ] 18. Implement device hot-swapping and reconnection handling
+- [x] 18. Implement device hot-swapping and reconnection handling
 
   - Add real-time device connection/disconnection detection using AVAudioSession notifications
   - Implement automatic channel reassignment when devices connect/disconnect

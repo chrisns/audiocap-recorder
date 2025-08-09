@@ -60,4 +60,33 @@ final class InputDeviceManagerTests: XCTestCase {
         for ch in newAssigned { XCTAssertTrue((3...8).contains(ch)) }
         XCTAssertEqual(Set(newAssigned).count, newAssigned.count) // unique channels
     }
+
+    func testReconnectRestoresPreviousChannelWhenAvailable() {
+        let manager = InputDeviceManager()
+        // Initial set assigns channels 3 and 4
+        let first = manager.assignChannels(for: [
+            AudioInputDevice(uid: "X", name: "Mic X", channelCount: 1, sampleRate: 48_000),
+            AudioInputDevice(uid: "Y", name: "Mic Y", channelCount: 1, sampleRate: 48_000)
+        ])
+        let chX1 = first.first { $0.uid == "X" }!.assignedChannel!
+        let chY1 = first.first { $0.uid == "Y" }!.assignedChannel!
+        XCTAssertEqual(Set([chX1, chY1]), Set([3, 4]))
+
+        // X disconnects (remove from list), Y persists
+        let second = manager.assignChannels(for: [
+            AudioInputDevice(uid: "Y", name: "Mic Y", channelCount: 1, sampleRate: 48_000)
+        ])
+        let chY2 = second.first { $0.uid == "Y" }!.assignedChannel!
+        XCTAssertEqual(chY2, chY1) // Y keeps its channel
+
+        // X reconnects; previous channel for X should be restored if free
+        let third = manager.assignChannels(for: [
+            AudioInputDevice(uid: "X", name: "Mic X", channelCount: 1, sampleRate: 48_000),
+            AudioInputDevice(uid: "Y", name: "Mic Y", channelCount: 1, sampleRate: 48_000)
+        ])
+        let chX3 = third.first { $0.uid == "X" }!.assignedChannel!
+        let chY3 = third.first { $0.uid == "Y" }!.assignedChannel!
+        XCTAssertEqual(chX3, chX1)
+        XCTAssertEqual(chY3, chY1)
+    }
 }

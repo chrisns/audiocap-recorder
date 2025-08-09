@@ -6,6 +6,7 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
 
     private var connectedDevicesByUID: [String: AudioInputDevice] = [:]
     private var channelByUID: [String: Int] = [:] // uid -> channel (3-8)
+    private var previousChannelByUID: [String: Int] = [:] // persistent last-known channel
     private var observers: [NSObjectProtocol] = []
 
     private var enginesByUID: [String: AVAudioEngine] = [:]
@@ -52,6 +53,7 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
             guard let device = note.object as? AVCaptureDevice, device.hasMediaType(.audio) else { return }
             let uid = device.uniqueID
             let previousChannel = self.channelByUID[uid]
+            if let previousChannel { self.previousChannelByUID[uid] = previousChannel }
             self.connectedDevicesByUID.removeValue(forKey: uid)
             self.channelByUID.removeValue(forKey: uid)
             self.stopCapture(forUID: uid)
@@ -100,12 +102,21 @@ extension InputDeviceManager {
         let availableChannels = Array(3...8)
         var usedChannels = Set(channelByUID.values)
 
+        // Try to restore previous channels for devices without a current assignment
         let unassignedUIDs = devices
             .map { $0.uid }
             .filter { channelByUID[$0] == nil }
             .sorted()
 
+        // First pass: restore previous channels when free
         for uid in unassignedUIDs {
+            if let prev = previousChannelByUID[uid], !usedChannels.contains(prev) {
+                channelByUID[uid] = prev
+                usedChannels.insert(prev)
+            }
+        }
+        // Second pass: assign first available channels to remaining
+        for uid in unassignedUIDs where channelByUID[uid] == nil {
             guard let nextChannel = availableChannels.first(where: { !usedChannels.contains($0) }) else { break }
             channelByUID[uid] = nextChannel
             usedChannels.insert(nextChannel)
@@ -114,6 +125,9 @@ extension InputDeviceManager {
         var updated: [AudioInputDevice] = []
         updated.reserveCapacity(devices.count)
         for var dev in devices {
+            if let ch = channelByUID[dev.uid] {
+                previousChannelByUID[dev.uid] = ch
+            }
             dev.assignedChannel = channelByUID[dev.uid]
             updated.append(dev)
         }
