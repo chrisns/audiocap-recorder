@@ -178,7 +178,7 @@
   - Write unit tests for 8-channel audio processing and buffer management
   - _Requirements: 12.2, 12.3, 12.4_
 
-- [ ] 20. Update FileController for 8-channel WAV output and channel mapping logs
+- [x] 20. Update FileController for 8-channel WAV output and channel mapping logs
 
   - Modify WAV file writing to support 8-channel audio format using AudioToolbox
   - Create channel mapping log file generation in JSON format alongside WAV files

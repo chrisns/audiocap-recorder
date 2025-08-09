@@ -40,6 +40,29 @@ public final class FileController: FileControllerProtocol {
         }
     }
 
+    public func writeMultiChannelAudioData(_ data: Data, to directory: String) throws -> URL {
+        // Reuse the same filename generation; content is multi-channel WAV data
+        return try writeAudioData(data, to: directory)
+    }
+
+    public func writeChannelMappingLog(_ mappingJSON: Data, to directory: String, baseFilename: String) throws -> URL {
+        let dirURL = expandTilde(in: directory)
+        let jsonName: String
+        if baseFilename.lowercased().hasSuffix(".wav") {
+            jsonName = String(baseFilename.dropLast(4)) + "-channels.json"
+        } else {
+            jsonName = baseFilename + "-channels.json"
+        }
+        do {
+            try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+            let fileURL = dirURL.appendingPathComponent(jsonName)
+            try mappingJSON.write(to: fileURL, options: .atomic)
+            return fileURL
+        } catch {
+            throw AudioRecorderError.fileSystemError(error.localizedDescription)
+        }
+    }
+
     // MARK: - Helpers
     public func defaultOutputDirectory() -> URL {
         let docs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents", isDirectory: true)
