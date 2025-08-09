@@ -1,7 +1,8 @@
 import Foundation
+import AVFoundation
 
 public protocol AudioProcessorProtocol {
-    func processSampleBuffer(_ sampleBuffer: Any, from processes: [RecorderProcessInfo]) -> Any?
-    func mixAudioStreams(_ streams: [Any]) -> Any?
-    func convertToWAV(_ buffer: Any) -> Data
+    func processAudioBuffer(_ sampleBuffer: CMSampleBuffer, from processes: [RecorderProcessInfo]) -> AVAudioPCMBuffer?
+    func mixAudioStreams(_ streams: [AVAudioPCMBuffer]) -> AVAudioPCMBuffer?
+    func convertToWAV(_ buffer: AVAudioPCMBuffer) -> Data
 }
