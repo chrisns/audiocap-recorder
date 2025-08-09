@@ -1,7 +1,13 @@
 import Foundation
 import CoreGraphics
 
-public struct PermissionManager {
+public protocol PermissionManaging {
+    func checkScreenRecordingPermission() -> Bool
+    func requestScreenRecordingPermission()
+    func displayPermissionInstructions(for type: AudioRecorderError.PermissionType)
+}
+
+public struct PermissionManager: PermissionManaging {
     public init() {}
 
     public func checkScreenRecordingPermission() -> Bool {

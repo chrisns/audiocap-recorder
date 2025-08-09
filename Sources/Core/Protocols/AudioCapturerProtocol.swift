@@ -8,7 +8,7 @@ public protocol AudioCapturerDelegate: AnyObject {
 }
 
 public protocol AudioCapturerProtocol {
-    func startCapture(for processes: [RecorderProcessInfo]) throws
+    func startCapture(for processes: [RecorderProcessInfo]) async throws
     func stopCapture()
     var delegate: AudioCapturerDelegate? { get set }
 }

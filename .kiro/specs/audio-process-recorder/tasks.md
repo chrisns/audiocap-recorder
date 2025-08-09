@@ -26,7 +26,7 @@
   - Write unit tests for process discovery and regex matching
   - _Requirements: 1.1, 1.3, 4.1, 4.2_
 
-- [ ] 4. Build ScreenCaptureKit audio capture foundation
+- [x] 4. Build ScreenCaptureKit audio capture foundation
 
   - Create AudioCapturer class conforming to SCStreamDelegate
   - Implement ScreenCaptureKit configuration with proper audio settings
