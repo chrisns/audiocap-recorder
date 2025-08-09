@@ -1,0 +1,32 @@
+import Foundation
+
+public protocol InputDeviceManagerDelegate: AnyObject {
+    func deviceConnected(_ device: AudioInputDevice, assignedToChannel channel: Int)
+    func deviceDisconnected(_ device: AudioInputDevice, fromChannel channel: Int)
+}
+
+public protocol InputDeviceManagerProtocol: AnyObject {
+    var delegate: InputDeviceManagerDelegate? { get set }
+    func enumerateInputDevices() -> [AudioInputDevice]
+    func startMonitoring()
+    func stopMonitoring()
+    func currentChannelAssignments() -> [Int: AudioInputDevice]
+}
+
+public struct AudioInputDevice: Equatable, Hashable {
+    public let uid: String
+    public let name: String
+    public let channelCount: Int
+    public let sampleRate: Double
+    public var assignedChannel: Int?
+    public var isConnected: Bool
+
+    public init(uid: String, name: String, channelCount: Int, sampleRate: Double, assignedChannel: Int? = nil, isConnected: Bool = true) {
+        self.uid = uid
+        self.name = name
+        self.channelCount = channelCount
+        self.sampleRate = sampleRate
+        self.assignedChannel = assignedChannel
+        self.isConnected = isConnected
+    }
+}

@@ -138,7 +138,7 @@
   - Write unit tests for CLI argument parsing with the new flag
   - _Requirements: 12.1, 14.1_
 
-- [ ] 16. Implement InputDeviceManager for audio input device enumeration and monitoring
+- [x] 16. Implement InputDeviceManager for audio input device enumeration and monitoring
 
   - Create InputDeviceManager class with AVFoundation integration for device discovery
   - Implement device enumeration using AVAudioSession and AVCaptureDevice APIs
