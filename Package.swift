@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "AudioCap4",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
         .executable(name: "audiocap-recorder", targets: ["AudioCap4"])
