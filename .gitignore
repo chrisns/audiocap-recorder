@@ -7,3 +7,11 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 .tmp/
+# Local tools and compiled binaries
+/Tools/SineWavePlayer/sine_player
+/Tools/**/*.o
+/Tools/**/*.a
+/Tools/**/*.so
+/Tools/**/*.dylib
+/Tools/**/*.exe
+*.dSYM

@@ -22,7 +22,16 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     private let captureInputsEnabled: Bool
     private let inputSyncQueue = DispatchQueue(label: "audio.capturer.inputs")
     private var latestInputByChannel: [Int: AVAudioPCMBuffer] = [:]
-
+    
+    // Synchronization for multichannel writing
+    private let writeQueue = DispatchQueue(label: "audio.capturer.write")
+    private var writeTimer: DispatchSourceTimer?
+    private let writeInterval: TimeInterval = 0.005 // Write every 5ms (240 samples at 48kHz) for smoother output
+    
+    // Ring buffers for accumulating audio
+    private var processRingBuffer: RingBuffer?
+    private var inputRingBuffers: [Int: RingBuffer] = [:]
+    
     private var extAudioFile: ExtAudioFileRef?
 
     public init(
@@ -127,8 +136,16 @@ extension AudioCapturer {
             let set = ExtAudioFileSetProperty(extRef, kExtAudioFileProperty_ClientDataFormat, UInt32(MemoryLayout<AudioStreamBasicDescription>.size), &client)
             if set != noErr { ExtAudioFileDispose(extRef); throw AudioRecorderError.fileSystemError("Failed to set client format, status=\(set)") }
             self.extAudioFile = extRef
-            // Seed file with a small block of silence
-            writeSilence(frames: 1024)
+            
+            // Initialize ring buffers (1 second capacity)
+            let bufferCapacity = 48_000
+            self.processRingBuffer = RingBuffer(capacity: bufferCapacity)
+            for channel in 2...8 {
+                self.inputRingBuffers[channel] = RingBuffer(capacity: bufferCapacity)
+            }
+            
+            // Start write timer
+            startWriteTimer()
         } else {
             // Mono CAF using AVAudioFile
             let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
@@ -142,35 +159,50 @@ extension AudioCapturer {
     }
 
     public func stopCapture() {
-        recordingTimer?.stop(); recordingTimer = nil
-        let currentStream = self.stream; self.stream = nil
-        if let s = currentStream { s.stopCapture(completionHandler: { _ in }) }
-        if let url = self.outputURL { delegate?.didStopRecording(outputFileURL: url) }
-        if let ext = extAudioFile { ExtAudioFileDispose(ext) }
-        extAudioFile = nil
-        outputFile = nil
+        recordingTimer?.stop()
+        recordingTimer = nil
+        
+        if captureInputsEnabled {
+            stopWriteTimer()
+        }
+        
+        stream?.stopCapture { [weak self] error in
+            if let error = error {
+                self?.delegate?.didEncounterError(.audioCaptureFailed(error.localizedDescription))
+            }
+        }
+        stream = nil
+        
+        if let url = self.outputURL {
+            delegate?.didStopRecording(outputFileURL: url)
+        }
+        
+        if let ext = extAudioFile {
+            ExtAudioFileDispose(ext)
+            self.extAudioFile = nil
+        }
+        
+        if let file = outputFile {
+            outputFile = nil
+        }
+        
+        // Clean up ring buffers
+        processRingBuffer = nil
+        inputRingBuffers.removeAll()
     }
 }
 
 extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
     public func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
         guard outputType == .audio else { return }
+        
         do {
             if captureInputsEnabled {
-                guard let ext = self.extAudioFile else { return }
                 guard let pcmMono = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
-                let frames = Int(pcmMono.frameLength)
-                if frames <= 0 { return }
-                // Build non-interleaved 8ch buffer list with process on ch 1 only
-                withTemporaryABL(channelCount: 8, frames: frames) { abl, channels in
-                    if let procCh = pcmMono.floatChannelData {
-                        memcpy(channels[0], procCh[0], frames * MemoryLayout<Float>.size)
-                        // Channels 1-7 remain silent (for input devices)
-                    }
-                    let status = ExtAudioFileWrite(ext, UInt32(frames), abl)
-                    if status != noErr {
-                        delegate?.didEncounterError(.fileSystemError("ExtAudioFileWrite failed: \(status)"))
-                    }
+                
+                // Write to process ring buffer
+                if let processData = pcmMono.floatChannelData?[0] {
+                    processRingBuffer?.write(processData, frameCount: Int(pcmMono.frameLength))
                 }
             } else {
                 guard let file = self.outputFile,
@@ -189,26 +221,57 @@ extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
 
 public extension AudioCapturer {
     func receiveInputAudio(from device: AudioInputDevice, buffer: AVAudioPCMBuffer) {
-        guard captureInputsEnabled, let channel = device.assignedChannel, let ext = self.extAudioFile else { return }
-        inputSyncQueue.async { self.latestInputByChannel[channel] = buffer }
-        // Synchronous write to avoid Sendable capture issues
-        let targetIndex = channel - 1
-        let frames = Int(buffer.frameLength)
-        guard frames > 0, targetIndex >= 0, targetIndex < 8 else { return }
+        guard captureInputsEnabled, let channel = device.assignedChannel else { return }
         
-        self.withTemporaryABL(channelCount: 8, frames: frames) { abl, channels in
-            if let src = buffer.floatChannelData {
-                memcpy(channels[targetIndex], src[0], frames * MemoryLayout<Float>.size)
-            }
-            let status = ExtAudioFileWrite(ext, UInt32(frames), abl)
-            if status != noErr {
-                self.delegate?.didEncounterError(.fileSystemError("ExtAudioFileWrite (input) failed: \(status)"))
-            }
+        // Write to input ring buffer
+        if let inputData = buffer.floatChannelData?[0],
+           let ringBuffer = inputRingBuffers[channel] {
+            ringBuffer.write(inputData, frameCount: Int(buffer.frameLength))
         }
     }
 }
 
 private extension AudioCapturer {
+    func startWriteTimer() {
+        let timer = DispatchSource.makeTimerSource(queue: writeQueue)
+        timer.schedule(deadline: .now(), repeating: writeInterval)
+        timer.setEventHandler { [weak self] in
+            self?.writeAudioFrame()
+        }
+        timer.resume()
+        self.writeTimer = timer
+    }
+    
+    func stopWriteTimer() {
+        writeTimer?.cancel()
+        writeTimer = nil
+    }
+    
+    func writeAudioFrame() {
+        guard let ext = self.extAudioFile else { return }
+        
+        let framesToWrite = Int(writeInterval * 48_000)
+        
+        withTemporaryABL(channelCount: 8, frames: framesToWrite) { abl, channels in
+            // Channel 1: Process audio
+            if let ringBuffer = self.processRingBuffer {
+                _ = ringBuffer.read(into: channels[0], frameCount: framesToWrite)
+            }
+            
+            // Channels 2-8: Input devices
+            for channel in 2...8 {
+                if let ringBuffer = self.inputRingBuffers[channel] {
+                    _ = ringBuffer.read(into: channels[channel-1], frameCount: framesToWrite)
+                }
+            }
+            
+            let status = ExtAudioFileWrite(ext, UInt32(framesToWrite), abl)
+            if status != noErr {
+                self.delegate?.didEncounterError(.fileSystemError("ExtAudioFileWrite failed: \(status)"))
+            }
+        }
+    }
+    
     func preferredDisplay(from displays: [SCDisplay]) -> SCDisplay? {
         if let mainScreen = NSScreen.main, let id = mainScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
             return displays.first { $0.displayID == id }
@@ -240,13 +303,6 @@ private extension AudioCapturer {
         body(UnsafePointer(ablPtr), chanPtrs)
         for p in chanPtrs { p.deallocate() }
         raw.deallocate()
-    }
-
-    func writeSilence(frames: Int) {
-        guard let ext = self.extAudioFile else { return }
-        withTemporaryABL(channelCount: 8, frames: frames) { abl, _ in
-            _ = ExtAudioFileWrite(ext, UInt32(frames), abl)
-        }
     }
 }
 
