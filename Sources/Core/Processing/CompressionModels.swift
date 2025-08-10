@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 /// Primary configuration for compression
-struct CompressionConfiguration: Codable, Equatable {
+public struct CompressionConfiguration: Codable, Equatable {
     var format: CompressionFormat
     var bitrate: UInt32
     var quality: CompressionQuality?
@@ -29,7 +29,7 @@ struct CompressionConfiguration: Codable, Equatable {
         self.enableMultiChannel = enableMultiChannel
     }
 
-    enum CompressionFormat: String, Codable, CaseIterable {
+    public enum CompressionFormat: String, Codable, CaseIterable, Sendable {
         case aac
         case mp3
         case alac

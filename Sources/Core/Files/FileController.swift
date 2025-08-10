@@ -49,7 +49,7 @@ public final class FileController: FileControllerProtocol {
     public func writeChannelMappingLog(_ mappingJSON: Data, to directory: String, baseFilename: String) throws -> URL {
         let dirURL = expandTilde(in: directory)
         let jsonName: String
-        if baseFilename.lowercased().hasSuffix(".wav") || baseFilename.lowercased().hasSuffix(".caf") || baseFilename.lowercased().hasSuffix(".m4a") {
+        if baseFilename.lowercased().hasSuffix(".wav") || baseFilename.lowercased().hasSuffix(".caf") || baseFilename.lowercased().hasSuffix(".m4a") || baseFilename.lowercased().hasSuffix(".mp3") {
             jsonName = String(baseFilename.dropLast(4)) + "-channels.json"
         } else {
             jsonName = baseFilename + "-channels.json"
@@ -137,6 +137,71 @@ public final class FileController: FileControllerProtocol {
         guard originalBytes > 0 else { return (compressed, 0.0) }
         let ratio = 1.0 - Double(compressed) / Double(originalBytes)
         return (compressed, ratio)
+    }
+
+    // MARK: - Lossy compressed files
+    public func createCompressedFile(in directory: String, format: CompressionConfiguration.CompressionFormat, audioFormat: AVAudioFormat) throws -> AVAudioFile {
+        let dirURL = expandTilde(in: directory)
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        let ext = format == .mp3 ? "mp3" : "m4a"
+        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename(extension: ext))
+        // Build minimal encoder settings; encoders will refine these during actual use
+        let channels = Int(audioFormat.channelCount)
+        let sampleRate = audioFormat.sampleRate
+        let settings: [String: Any]
+        switch format {
+        case .aac:
+            settings = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVNumberOfChannelsKey: channels,
+                AVSampleRateKey: sampleRate,
+                AVEncoderBitRateKey: 128_000,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+        case .mp3:
+            settings = [
+                AVFormatIDKey: kAudioFormatMPEGLayer3,
+                AVNumberOfChannelsKey: min(channels, 2),
+                AVSampleRateKey: sampleRate,
+                AVEncoderBitRateKey: 128_000,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+        case .alac, .uncompressed:
+            settings = audioFormat.settings
+        }
+        do {
+            return try AVAudioFile(forWriting: fileURL, settings: settings)
+        } catch {
+            throw AudioRecorderError.fileSystemError(error.localizedDescription)
+        }
+    }
+
+    public func writeCompressionStatistics(_ stats: CompressionStatistics, to directory: String, baseFilename: String? = nil) throws -> URL {
+        let dirURL = expandTilde(in: directory)
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        let name: String
+        if let base = baseFilename {
+            if base.lowercased().hasSuffix(".wav") || base.lowercased().hasSuffix(".caf") || base.lowercased().hasSuffix(".m4a") || base.lowercased().hasSuffix(".mp3") {
+                name = String(base.dropLast(4)) + "-compression.json"
+            } else {
+                name = base + "-compression.json"
+            }
+        } else {
+            name = generateTimestampedFilename(extension: "json")
+        }
+        let url = dirURL.appendingPathComponent(name)
+        let data = try JSONEncoder().encode(stats)
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    public func estimatedDiskSpaceRemaining(at directory: String) -> Int64 {
+        let url = expandTilde(in: directory)
+        do {
+            let values = try url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            if let bytes = values.volumeAvailableCapacityForImportantUsage { return bytes }
+        } catch { }
+        return -1
     }
 
     // MARK: - Helpers
