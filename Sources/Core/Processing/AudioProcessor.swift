@@ -4,9 +4,15 @@ import Accelerate
 
 public final class AudioProcessor: AudioProcessorProtocol {
     private let targetFormat: AVAudioFormat
+    private var compressionEngine: CompressionEngineProtocol?
 
     public init(sampleRate: Double = 48_000, channels: AVAudioChannelCount = 1) {
         self.targetFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channels)!
+    }
+
+    // Allows wiring in a compression engine (AAC/MP3)
+    public func setCompressionEngine(_ engine: CompressionEngineProtocol?) {
+        self.compressionEngine = engine
     }
 
     public func processAudioBuffer(_ sampleBuffer: CMSampleBuffer, from processes: [RecorderProcessInfo]) -> AVAudioPCMBuffer? {
@@ -199,6 +205,23 @@ public final class AudioProcessor: AudioProcessorProtocol {
         // Favor larger buffers for better compression efficiency
         // Use ~4096 frames (~85ms at 48k)
         return 4096
+    }
+
+    // MARK: - Compression routing
+    public func routeToCompression(buffer: AVAudioPCMBuffer, desiredFormat: AVAudioFormat?) {
+        let toSend: AVAudioPCMBuffer
+        if let fmt = desiredFormat {
+            toSend = convert(buffer: buffer, to: fmt)
+        } else {
+            toSend = buffer
+        }
+        _ = try? compressionEngine?.processAudioBuffer(toSend)
+    }
+
+    public func processAndRoute(sampleBuffer: CMSampleBuffer, processes: [RecorderProcessInfo], desiredFormat: AVAudioFormat?) -> AVAudioPCMBuffer? {
+        guard let mono = processAudioBuffer(sampleBuffer, from: processes) else { return nil }
+        routeToCompression(buffer: mono, desiredFormat: desiredFormat)
+        return mono
     }
 
     private func bufferDuration(_ buffer: AVAudioPCMBuffer) -> TimeInterval {

@@ -83,7 +83,7 @@ struct CompressionConfiguration: Codable, Equatable {
 }
 
 /// Convenience configuration for lossy encoders
-struct LossyCompressionConfiguration: Equatable {
+public struct LossyCompressionConfiguration: Equatable {
     let format: LossyFormat
     let bitrate: UInt32
     let enableVBR: Bool
@@ -98,7 +98,7 @@ struct LossyCompressionConfiguration: Equatable {
 }
 
 /// Statistics snapshot recorded at finalize
-struct CompressionStatistics: Codable, Equatable {
+public struct CompressionStatistics: Codable, Equatable {
     let sessionId: UUID
     let format: CompressionConfiguration.CompressionFormat
     let startTime: Date

@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 /// Describes a generic audio encoder used by a compression engine
-protocol AudioEncoderProtocol {
+public protocol AudioEncoderProtocol {
     func initialize(configuration: LossyCompressionConfiguration) throws
     func encode(buffer: AVAudioPCMBuffer) throws -> Data
     func finalize() throws -> CompressionStatistics
@@ -14,7 +14,7 @@ protocol AudioEncoderProtocol {
 }
 
 /// Provides a common facade for compression engines
-protocol CompressionEngineProtocol {
+public protocol CompressionEngineProtocol {
     func processAudioBuffer(_ buffer: AVAudioPCMBuffer) throws -> Data?
     func createOutputFile(at url: URL, format: AVAudioFormat) throws -> AVAudioFile
     func finalizeCompression() throws -> CompressionStatistics
@@ -22,7 +22,7 @@ protocol CompressionEngineProtocol {
 }
 
 /// Lightweight progress snapshot for realtime reporting
-struct CompressionProgress {
+public struct CompressionProgress {
     let bytesProcessed: Int64
     let estimatedTotalBytes: Int64
     let compressionRatio: Double
