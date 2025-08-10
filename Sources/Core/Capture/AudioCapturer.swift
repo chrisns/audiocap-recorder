@@ -34,6 +34,7 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     
     private var extAudioFile: ExtAudioFileRef?
     private let alacEnabled: Bool
+    private var alacWriteAvgMs: Double = 0
 
     public init(
         permissionManager: PermissionManaging = PermissionManager(),
@@ -103,62 +104,98 @@ extension AudioCapturer {
                 throw AudioRecorderError.fileSystemError("Failed to create default output directory at \(fallback.path)")
             }
         }
-        self.outputURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf"))
+        // Choose extension based on ALAC preference
+        let outExt = alacEnabled ? "m4a" : "caf"
+        self.outputURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: outExt))
 
         // Open writer
         if captureInputsEnabled {
-            // ExtAudioFile: Destination 8ch Float32 INTERLEAVED CAF; Client 8ch Float32 NON-INTERLEAVED
-            guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
-            var dst = AudioStreamBasicDescription(
-                mSampleRate: 48_000,
-                mFormatID: kAudioFormatLinearPCM,
-                mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
-                mBytesPerPacket: 8 * 4,
-                mFramesPerPacket: 1,
-                mBytesPerFrame: 8 * 4,
-                mChannelsPerFrame: 8,
-                mBitsPerChannel: 32,
-                mReserved: 0
-            )
-            var ref: ExtAudioFileRef? = nil
-            let status = ExtAudioFileCreateWithURL(url as CFURL, kAudioFileCAFType, &dst, nil, AudioFileFlags.eraseFile.rawValue, &ref)
-            guard status == noErr, let extRef = ref else {
-                throw AudioRecorderError.fileSystemError("Failed to create CAF file at \(url.path), status=\(status)")
+            // Multi-channel path (8ch)
+            if alacEnabled {
+                // Use AVAudioFile with ALAC settings; assemble buffers and write
+                guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
+                do {
+                    let cfg = ALACConfiguration(sampleRate: 48_000, channelCount: 8, bitDepth: 16, quality: .max)
+                    let settings = try ALACConfigurator.alacSettings(for: cfg)
+                    self.outputFile = try AVAudioFile(forWriting: url, settings: settings)
+                } catch {
+                    // Fallback to CAF ExtAudioFile
+                    try openCAFMultichannelWriter(url: dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf")))
+                }
+            } else {
+                // CAF multichannel via ExtAudioFile
+                guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
+                try openCAFMultichannelWriter(url: url)
             }
-            var client = AudioStreamBasicDescription(
-                mSampleRate: 48_000,
-                mFormatID: kAudioFormatLinearPCM,
-                mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
-                mBytesPerPacket: 4,
-                mFramesPerPacket: 1,
-                mBytesPerFrame: 4,
-                mChannelsPerFrame: 8,
-                mBitsPerChannel: 32,
-                mReserved: 0
-            )
-            let set = ExtAudioFileSetProperty(extRef, kExtAudioFileProperty_ClientDataFormat, UInt32(MemoryLayout<AudioStreamBasicDescription>.size), &client)
-            if set != noErr { ExtAudioFileDispose(extRef); throw AudioRecorderError.fileSystemError("Failed to set client format, status=\(set)") }
-            self.extAudioFile = extRef
-            
             // Initialize ring buffers (1 second capacity)
             let bufferCapacity = 48_000
             self.processRingBuffer = RingBuffer(capacity: bufferCapacity)
             for channel in 2...8 {
                 self.inputRingBuffers[channel] = RingBuffer(capacity: bufferCapacity)
             }
-            
             // Start write timer
             startWriteTimer()
         } else {
-            // Mono CAF using AVAudioFile
-            let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
-            self.outputFile = try AVAudioFile(forWriting: self.outputURL!, settings: mono.settings)
+            // Mono path
+            if alacEnabled {
+                // ALAC mono via AVAudioFile
+                guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
+                do {
+                    let cfg = ALACConfiguration(sampleRate: 48_000, channelCount: 1, bitDepth: 16, quality: .max)
+                    let settings = try ALACConfigurator.alacSettings(for: cfg)
+                    self.outputFile = try AVAudioFile(forWriting: url, settings: settings)
+                } catch {
+                    // Fallback to mono CAF via AVAudioFile
+                    let fallbackURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf"))
+                    let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
+                    self.outputURL = fallbackURL
+                    self.outputFile = try AVAudioFile(forWriting: fallbackURL, settings: mono.settings)
+                }
+            } else {
+                // Mono CAF using AVAudioFile
+                let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
+                self.outputFile = try AVAudioFile(forWriting: self.outputURL!, settings: mono.settings)
+            }
         }
 
         try await stream.startCapture()
         self.stream = stream
         delegate?.didStartRecording()
         self.recordingTimer = nil
+    }
+
+    private func openCAFMultichannelWriter(url: URL) throws {
+        var dst = AudioStreamBasicDescription(
+            mSampleRate: 48_000,
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+            mBytesPerPacket: 8 * 4,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 8 * 4,
+            mChannelsPerFrame: 8,
+            mBitsPerChannel: 32,
+            mReserved: 0
+        )
+        var ref: ExtAudioFileRef? = nil
+        let status = ExtAudioFileCreateWithURL(url as CFURL, kAudioFileCAFType, &dst, nil, AudioFileFlags.eraseFile.rawValue, &ref)
+        guard status == noErr, let extRef = ref else {
+            throw AudioRecorderError.fileSystemError("Failed to create CAF file at \(url.path), status=\(status)")
+        }
+        var client = AudioStreamBasicDescription(
+            mSampleRate: 48_000,
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
+            mBytesPerPacket: 4,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 4,
+            mChannelsPerFrame: 8,
+            mBitsPerChannel: 32,
+            mReserved: 0
+        )
+        let set = ExtAudioFileSetProperty(extRef, kExtAudioFileProperty_ClientDataFormat, UInt32(MemoryLayout<AudioStreamBasicDescription>.size), &client)
+        if set != noErr { ExtAudioFileDispose(extRef); throw AudioRecorderError.fileSystemError("Failed to set client format, status=\(set)") }
+        self.extAudioFile = extRef
+        self.outputURL = url
     }
 
     public func stopCapture() {
@@ -251,9 +288,59 @@ private extension AudioCapturer {
     }
     
     func writeAudioFrame() {
-        guard let ext = self.extAudioFile else { return }
-        
         let framesToWrite = Int(writeInterval * 48_000)
+        
+        if alacEnabled, let file = self.outputFile, extAudioFile == nil {
+            // Assemble AVAudioPCMBuffer with 8 channels and write via AVAudioFile (ALAC)
+            var asbd = AudioStreamBasicDescription(
+                mSampleRate: 48_000,
+                mFormatID: kAudioFormatLinearPCM,
+                mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
+                mBytesPerPacket: 4,
+                mFramesPerPacket: 1,
+                mBytesPerFrame: 4,
+                mChannelsPerFrame: 8,
+                mBitsPerChannel: 32,
+                mReserved: 0
+            )
+            guard let fmt = AVAudioFormat(streamDescription: &asbd),
+                  let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(framesToWrite)) else { return }
+            buf.frameLength = AVAudioFrameCount(framesToWrite)
+            guard let channels = buf.floatChannelData else { return }
+            // Channel 1: Process
+            if let ringBuffer = self.processRingBuffer {
+                _ = ringBuffer.read(into: channels[0], frameCount: framesToWrite)
+            } else {
+                memset(channels[0], 0, framesToWrite * MemoryLayout<Float>.size)
+            }
+            // Channels 2-8: Inputs
+            for channel in 2...8 {
+                if let ringBuffer = self.inputRingBuffers[channel] {
+                    _ = ringBuffer.read(into: channels[channel-1], frameCount: framesToWrite)
+                } else {
+                    memset(channels[channel-1], 0, framesToWrite * MemoryLayout<Float>.size)
+                }
+            }
+            let start = mach_absolute_time()
+            do {
+                try file.write(from: buf)
+            } catch {
+                // Fallback to CAF ext writer if ALAC write fails mid-session
+                if let url = self.outputURL {
+                    do { try openCAFMultichannelWriter(url: url.deletingPathExtension().appendingPathExtension("caf")) } catch { }
+                }
+            }
+            let end = mach_absolute_time()
+            // Update simple moving average (scaled to ms) using mach timebase
+            var timebase = mach_timebase_info_data_t()
+            mach_timebase_info(&timebase)
+            let ns = (end - start) * UInt64(timebase.numer) / UInt64(timebase.denom)
+            let ms = Double(ns) / 1_000_000.0
+            alacWriteAvgMs = (alacWriteAvgMs * 0.9) + (ms * 0.1)
+            return
+        }
+        
+        guard let ext = self.extAudioFile else { return }
         
         withTemporaryABL(channelCount: 8, frames: framesToWrite) { abl, channels in
             // Channel 1: Process audio
