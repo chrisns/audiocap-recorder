@@ -5,6 +5,7 @@ final class AACEncoder: AudioEncoderProtocol {
     private var audioFile: AVAudioFile?
     private var configuration: LossyCompressionConfiguration?
     private var converter: AVAudioConverter?
+    private var startDate: Date?
 
     // Exposed for tests within module
     internal private(set) var lastSettings: [String: Any] = [:]
@@ -25,6 +26,7 @@ final class AACEncoder: AudioEncoderProtocol {
         lastSettings = settings
         let file = try AVAudioFile(forWriting: url, settings: settings)
         self.audioFile = file
+        self.startDate = Date()
         // Prepare converter when needed
         if format.sampleRate != cfg.sampleRate || format.channelCount != AVAudioChannelCount(cfg.channelCount) {
             let dstFormat = AVAudioFormat(standardFormatWithSampleRate: cfg.sampleRate, channels: AVAudioChannelCount(cfg.channelCount))!
@@ -61,26 +63,32 @@ final class AACEncoder: AudioEncoderProtocol {
 
     func finalize() throws -> CompressionStatistics {
         guard let cfg = configuration else { throw AudioRecorderError.compressionConfigurationInvalid("Missing config") }
+        let end = Date()
+        let start = startDate ?? end
+        let duration = end.timeIntervalSince(start)
+        let url = audioFile?.url
+        let compressedSize = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { Int64($0 ?? 0) } ?? 0
+        let avgKbps: UInt32 = duration > 0 ? UInt32((Double(compressedSize) * 8.0 / duration) / 1000.0) : cfg.bitrate
         return CompressionStatistics(
             sessionId: UUID(),
             format: .aac,
-            startTime: Date(),
-            endTime: Date(),
-            duration: 0,
+            startTime: start,
+            endTime: end,
+            duration: duration,
             originalSize: 0,
-            compressedSize: 0,
+            compressedSize: compressedSize,
             compressionRatio: 0,
             fileSizeReduction: 0,
             bitrate: cfg.bitrate,
             sampleRate: cfg.sampleRate,
             channelCount: cfg.channelCount,
             enabledVBR: cfg.enableVBR,
-            encodingTime: 0,
-            averageEncodingSpeed: 0,
+            encodingTime: duration,
+            averageEncodingSpeed: duration > 0 ? (Double(compressedSize) / 1_000_000.0) / duration : 0,
             cpuUsagePercent: 0,
             memoryUsageMB: 0,
-            averageBitrate: nil,
-            peakBitrate: nil
+            averageBitrate: cfg.enableVBR ? avgKbps : nil,
+            peakBitrate: cfg.enableVBR ? avgKbps : nil
         )
     }
 

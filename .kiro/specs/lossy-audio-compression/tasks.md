@@ -117,7 +117,7 @@
   - Write integration tests for complete lossy compression recording workflows
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 12. Add Variable Bitrate (VBR) encoding support for AAC
+- [x] 12. Add Variable Bitrate (VBR) encoding support for AAC
 
   - Implement VBR configuration in AACEncoder with quality-based bitrate adjustment
   - Add VBR-specific settings and optimization for dynamic bitrate allocation

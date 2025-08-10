@@ -5,6 +5,7 @@ final class MP3Encoder: AudioEncoderProtocol {
     private var audioFile: AVAudioFile?
     private var configuration: LossyCompressionConfiguration?
     private var converter: AVAudioConverter?
+    private var startDate: Date?
 
     internal private(set) var lastSettings: [String: Any] = [:]
 
@@ -28,6 +29,7 @@ final class MP3Encoder: AudioEncoderProtocol {
         do {
             let file = try AVAudioFile(forWriting: url, settings: settings)
             self.audioFile = file
+            self.startDate = Date()
         } catch {
             throw AudioRecorderError.compressionNotSupported("MP3 writing not supported: \(error.localizedDescription)")
         }
@@ -66,22 +68,27 @@ final class MP3Encoder: AudioEncoderProtocol {
 
     func finalize() throws -> CompressionStatistics {
         guard let cfg = configuration else { throw AudioRecorderError.compressionConfigurationInvalid("Missing config") }
+        let end = Date()
+        let start = startDate ?? end
+        let duration = end.timeIntervalSince(start)
+        let url = audioFile?.url
+        let compressedSize = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { Int64($0 ?? 0) } ?? 0
         return CompressionStatistics(
             sessionId: UUID(),
             format: .mp3,
-            startTime: Date(),
-            endTime: Date(),
-            duration: 0,
+            startTime: start,
+            endTime: end,
+            duration: duration,
             originalSize: 0,
-            compressedSize: 0,
+            compressedSize: compressedSize,
             compressionRatio: 0,
             fileSizeReduction: 0,
             bitrate: cfg.bitrate,
             sampleRate: cfg.sampleRate,
             channelCount: cfg.channelCount,
             enabledVBR: cfg.enableVBR,
-            encodingTime: 0,
-            averageEncodingSpeed: 0,
+            encodingTime: duration,
+            averageEncodingSpeed: duration > 0 ? (Double(compressedSize) / 1_000_000.0) / duration : 0,
             cpuUsagePercent: 0,
             memoryUsageMB: 0,
             averageBitrate: nil,

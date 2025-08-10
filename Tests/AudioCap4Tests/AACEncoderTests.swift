@@ -35,4 +35,18 @@ final class AACEncoderTests: XCTestCase {
         XCTAssertEqual(Int(stats.sampleRate), 44100)
         XCTAssertEqual(stats.channelCount, 2)
     }
+
+    func testVBRFinalizeReportsAverageBitrate() throws {
+        let enc = AACEncoder()
+        let cfg = LossyCompressionConfiguration(format: .aac, bitrate: 192, enableVBR: true, sampleRate: 44100, channelCount: 2, quality: .high)
+        try enc.initialize(configuration: cfg)
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("m4a")
+        let inFmt = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
+        _ = try enc.createAudioFile(at: tmp, format: inFmt)
+        let buf = AVAudioPCMBuffer(pcmFormat: inFmt, frameCapacity: 1024)!
+        buf.frameLength = 1024
+        _ = try enc.encode(buffer: buf)
+        let stats = try enc.finalize()
+        XCTAssertNotNil(stats.averageBitrate)
+    }
 }
