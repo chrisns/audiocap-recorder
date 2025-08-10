@@ -7,6 +7,8 @@ public enum AudioRecorderError: LocalizedError, Equatable, Sendable {
     case fileSystemError(String)
     case invalidRegex(String)
     case configurationError(String)
+    case alacNotSupported
+    case alacEncodingFailed(String)
 
     public enum PermissionType: Equatable, Sendable {
         case screenRecording
@@ -29,6 +31,10 @@ public enum AudioRecorderError: LocalizedError, Equatable, Sendable {
             return "Invalid regex pattern: \(pattern)"
         case .configurationError(let message):
             return "Configuration error: \(message)"
+        case .alacNotSupported:
+            return "ALAC compression is not supported on this system configuration."
+        case .alacEncodingFailed(let message):
+            return "ALAC encoding failed: \(message)"
         }
     }
 }

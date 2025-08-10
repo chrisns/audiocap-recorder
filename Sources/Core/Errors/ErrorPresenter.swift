@@ -26,6 +26,10 @@ public struct ErrorPresenter {
             return "Invalid regex pattern: \(pattern). Please correct the pattern and try again."
         case .configurationError(let message):
             return "Configuration error: \(message)."
+        case .alacNotSupported:
+            return "ALAC compression is not supported on this system. Re-run without --alac to use uncompressed CAF."
+        case .alacEncodingFailed(let message):
+            return "ALAC encoding failed: \(message). The recorder will fall back to uncompressed CAF."
         }
     }
 }
