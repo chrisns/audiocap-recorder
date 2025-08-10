@@ -342,7 +342,7 @@
   - Update requirements and design docs to document mono configuration
   - Verify mono process audio on channel 1, microphone on channel 2
 
-- [ ] 38. Add ALAC compression CLI option and argument parsing
+- [x] 38. Add ALAC compression CLI option and argument parsing
 
 - [x] 38.1 Add `--alac`/`-a` flag to `AudioRecorderCLI`
   - Add `@Flag(name: [.customShort("a"), .customLong("alac")], help: "Enable ALAC (Apple Lossless) compression for output files") var enableALAC: Bool = false`

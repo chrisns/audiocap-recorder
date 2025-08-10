@@ -120,16 +120,32 @@ extension AudioCapturer {
                     let settings = try ALACConfigurator.alacSettings(for: cfg)
                     self.outputFile = try AVAudioFile(forWriting: url, settings: settings)
                 } catch {
-                    // Fallback to CAF Float32 non-interleaved
-                    let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 8, interleaved: false)!
+                    // Fallback to CAF Float32 interleaved - create directly with settings
+                    let settings: [String: Any] = [
+                        AVFormatIDKey: kAudioFormatLinearPCM,
+                        AVSampleRateKey: 48_000,
+                        AVNumberOfChannelsKey: 8,
+                        AVLinearPCMBitDepthKey: 32,
+                        AVLinearPCMIsFloatKey: true,
+                        AVLinearPCMIsBigEndianKey: false,
+                        AVLinearPCMIsNonInterleaved: false
+                    ]
                     let fallbackURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf"))
                     self.outputURL = fallbackURL
-                    self.outputFile = try AVAudioFile(forWriting: fallbackURL, settings: fmt.settings)
+                    self.outputFile = try AVAudioFile(forWriting: fallbackURL, settings: settings)
                 }
             } else {
-                // CAF Float32 non-interleaved
-                let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 8, interleaved: false)!
-                self.outputFile = try AVAudioFile(forWriting: url, settings: fmt.settings)
+                // CAF Float32 interleaved - create directly with settings
+                let settings: [String: Any] = [
+                    AVFormatIDKey: kAudioFormatLinearPCM,
+                    AVSampleRateKey: 48_000,
+                    AVNumberOfChannelsKey: 8,
+                    AVLinearPCMBitDepthKey: 32,
+                    AVLinearPCMIsFloatKey: true,
+                    AVLinearPCMIsBigEndianKey: false,
+                    AVLinearPCMIsNonInterleaved: false
+                ]
+                self.outputFile = try AVAudioFile(forWriting: url, settings: settings)
             }
             // Initialize ring buffers (1 second capacity)
             let bufferCapacity = 48_000
@@ -256,34 +272,58 @@ private extension AudioCapturer {
         guard let file = self.outputFile else { return }
         let framesToWrite = Int(writeInterval * 48_000)
         
-        // Assemble 8-channel Float32 non-interleaved buffer
-        var asbd = AudioStreamBasicDescription(
-            mSampleRate: 48_000,
-            mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
-            mBytesPerPacket: 4,
-            mFramesPerPacket: 1,
-            mBytesPerFrame: 4,
-            mChannelsPerFrame: 8,
-            mBitsPerChannel: 32,
-            mReserved: 0
-        )
-        guard let fmt = AVAudioFormat(streamDescription: &asbd),
-              let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(framesToWrite)) else { return }
+        // Use the file's processing format to ensure compatibility
+        let fmt = file.processingFormat
+        guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(framesToWrite)) else { return }
         buf.frameLength = AVAudioFrameCount(framesToWrite)
-        guard let channels = buf.floatChannelData else { return }
-        // Channel 1: Process
-        if let ringBuffer = self.processRingBuffer {
-            _ = ringBuffer.read(into: channels[0], frameCount: framesToWrite)
+        
+        // Check if format is interleaved or non-interleaved
+        if fmt.isInterleaved {
+            // Interleaved format
+            guard let data = buf.floatChannelData?[0] else { return }
+            
+            // Create temporary arrays to read from ring buffers
+            var processData = [Float](repeating: 0, count: framesToWrite)
+            var inputData = [[Float]](repeating: [Float](repeating: 0, count: framesToWrite), count: 7)
+            
+            // Read from ring buffers
+            if let ringBuffer = self.processRingBuffer {
+                _ = ringBuffer.read(into: &processData, frameCount: framesToWrite)
+            }
+            
+            for i in 0..<7 {
+                if let ringBuffer = self.inputRingBuffers[i + 2] {
+                    _ = ringBuffer.read(into: &inputData[i], frameCount: framesToWrite)
+                }
+            }
+            
+            // Interleave the data
+            for frame in 0..<framesToWrite {
+                let baseIndex = frame * 8
+                data[baseIndex] = processData[frame]  // Channel 0
+                for ch in 0..<7 {
+                    data[baseIndex + ch + 1] = inputData[ch][frame]  // Channels 1-7
+                }
+            }
         } else {
-            memset(channels[0], 0, framesToWrite * MemoryLayout<Float>.size)
-        }
-        // Channels 2-8: Inputs
-        for channel in 2...8 {
-            if let ringBuffer = self.inputRingBuffers[channel] {
-                _ = ringBuffer.read(into: channels[channel-1], frameCount: framesToWrite)
+            // Non-interleaved format
+            guard let channels = buf.floatChannelData else { return }
+            
+            // Channel 0: Process
+            if let ringBuffer = self.processRingBuffer {
+                _ = ringBuffer.read(into: channels[0], frameCount: framesToWrite)
             } else {
-                memset(channels[channel-1], 0, framesToWrite * MemoryLayout<Float>.size)
+                memset(channels[0], 0, framesToWrite * MemoryLayout<Float>.size)
+            }
+            
+            // Channels 1-7: Inputs (ring buffers are indexed 2-8)
+            for channel in 1..<8 {
+                let ringBufferIndex = channel + 1
+                if let ringBuffer = self.inputRingBuffers[ringBufferIndex] {
+                    _ = ringBuffer.read(into: channels[channel], frameCount: framesToWrite)
+                } else {
+                    memset(channels[channel], 0, framesToWrite * MemoryLayout<Float>.size)
+                }
             }
         }
         let start = mach_absolute_time()
