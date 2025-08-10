@@ -15,6 +15,7 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     private let fileController: FileControllerProtocol
     private let audioProcessor: AudioProcessorProtocol
     private var outputDirectoryPath: String?
+    private let logger: Logger?
 
     private var outputFile: AVAudioFile?
     private var outputURL: URL?
@@ -42,7 +43,8 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
         audioProcessor: AudioProcessorProtocol = AudioProcessor(),
         outputDirectoryPath: String? = nil,
         captureInputsEnabled: Bool = false,
-        alacEnabled: Bool = false
+        alacEnabled: Bool = false,
+        logger: Logger? = nil
     ) {
         self.permissionManager = permissionManager
         self.fileController = fileController
@@ -50,6 +52,7 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
         self.outputDirectoryPath = outputDirectoryPath
         self.captureInputsEnabled = captureInputsEnabled
         self.alacEnabled = alacEnabled
+        self.logger = logger
         super.init()
     }
 
@@ -107,6 +110,9 @@ extension AudioCapturer {
         // Choose extension based on ALAC preference
         let outExt = alacEnabled ? "m4a" : "caf"
         self.outputURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: outExt))
+        if let url = self.outputURL {
+            logger?.info("- Output file: \(url.path)")
+        }
 
         // Open writer
         if captureInputsEnabled {

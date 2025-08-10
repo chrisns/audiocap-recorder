@@ -100,7 +100,7 @@ public struct AudioRecorderCLI: ParsableCommand {
         }
 
         // Create capturer with knowledge of input capture and ALAC preference
-        let capturer = AudioCapturer(permissionManager: permissionManager, fileController: FileController(), audioProcessor: AudioProcessor(), outputDirectoryPath: outputDirectory, captureInputsEnabled: captureInputs, alacEnabled: enableALAC)
+        let capturer = AudioCapturer(permissionManager: permissionManager, fileController: FileController(), audioProcessor: AudioProcessor(), outputDirectoryPath: outputDirectory, captureInputsEnabled: captureInputs, alacEnabled: enableALAC, logger: logger)
 
         // Optional input device manager lifecycle
         var inputManager: InputDeviceManager? = nil

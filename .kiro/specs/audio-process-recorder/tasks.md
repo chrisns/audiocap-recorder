@@ -287,7 +287,7 @@
   - Ensure directory exists and file creation succeeds irrespective of stream start
   - Run all tests and ensure they pass
  
-- [ ] 31. Harden output directory creation and CAF creation with -c
+- [x] 31. Harden output directory creation and CAF creation with -c
 
   - Replace silent directory creation with strict do/catch and fallback to default directory
   - If both target and default directories fail, throw a file system error and exit
