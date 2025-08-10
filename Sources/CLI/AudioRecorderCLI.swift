@@ -5,7 +5,7 @@ import AVFoundation
 public struct AudioRecorderCLI: ParsableCommand {
     public static let configuration: CommandConfiguration = CommandConfiguration(
         commandName: "audiocap-recorder",
-        abstract: "Record system audio filtered to processes matching a regex."
+        abstract: "Record system audio filtered to processes matching a regex. Supports uncompressed CAF, ALAC lossless (--alac), and lossy compression options (--aac/--mp3)."
     )
 
     @Argument(help: "Regular expression to match process names and paths")
@@ -23,6 +23,25 @@ public struct AudioRecorderCLI: ParsableCommand {
     @Flag(name: [.customShort("a"), .customLong("alac")], help: "Enable ALAC (Apple Lossless) compression for output files (.m4a)")
     public var enableALAC: Bool = false
 
+    // Lossy compression options
+    @Flag(name: [.customLong("aac")], help: "Enable AAC compression for output files (.m4a)")
+    public var enableAAC: Bool = false
+
+    @Flag(name: [.customLong("mp3")], help: "Enable MP3 compression for output files (.mp3)")
+    public var enableMP3: Bool = false
+
+    @Option(name: [.customLong("bitrate")], help: "Set bitrate for lossy compression in kbps (64-320)")
+    public var bitrate: UInt32?
+
+    @Option(name: [.customLong("quality")], help: "Set quality preset for lossy compression: low, medium, high, maximum")
+    public var quality: CompressionQuality?
+
+    @Flag(name: [.customLong("vbr")], help: "Enable Variable Bitrate (VBR) encoding (AAC only)")
+    public var vbr: Bool = false
+
+    @Option(name: [.customLong("sample-rate")], help: "Set sample rate for lossy compression (22050, 44100, 48000)")
+    public var sampleRate: Double?
+
     public init() {}
 
     public func validate() throws {
@@ -35,9 +54,45 @@ public struct AudioRecorderCLI: ParsableCommand {
     }
 
     private func validateCompressionFlags() throws {
-        let selectedCompressionModes = (enableALAC ? 1 : 0)
-        if selectedCompressionModes > 1 {
-            throw ValidationError("Multiple compression modes selected. Please choose only one compression mode.")
+        let compressionFlags = [enableALAC, enableAAC, enableMP3]
+        let enabledCount = compressionFlags.filter { $0 }.count
+        if enabledCount > 1 {
+            throw ValidationError("Multiple compression modes selected. Please choose only one of --alac, --aac, or --mp3.")
+        }
+
+        if let bitrate = bitrate {
+            guard bitrate >= 64 && bitrate <= 320 else {
+                throw ValidationError("Bitrate must be between 64 and 320 kbps")
+            }
+            guard enableAAC || enableMP3 else {
+                throw ValidationError("--bitrate requires a lossy compression format (--aac or --mp3)")
+            }
+        }
+
+        if quality != nil {
+            guard enableAAC || enableMP3 else {
+                throw ValidationError("--quality requires a lossy compression format (--aac or --mp3)")
+            }
+        }
+
+        if let _ = quality, let _ = bitrate {
+            throw ValidationError("Specify either --quality or --bitrate, not both")
+        }
+
+        if vbr {
+            guard enableAAC else {
+                throw ValidationError("--vbr is only supported with --aac")
+            }
+        }
+
+        if let rate = sampleRate {
+            let allowed: Set<Double> = [22050, 44100, 48000]
+            guard allowed.contains(rate) else {
+                throw ValidationError("--sample-rate must be one of: 22050, 44100, 48000")
+            }
+            guard enableAAC || enableMP3 else {
+                throw ValidationError("--sample-rate requires a lossy compression format (--aac or --mp3)")
+            }
         }
     }
 
@@ -78,6 +133,12 @@ public struct AudioRecorderCLI: ParsableCommand {
         logger.info("- Verbose: \(verbose)")
         logger.info("- Capture inputs: \(captureInputs)")
         logger.info("- ALAC compression: \(enableALAC)")
+        logger.info("- AAC compression: \(enableAAC)")
+        logger.info("- MP3 compression: \(enableMP3)")
+        if let q = quality { logger.info("- Quality preset: \(q.rawValue)") }
+        if let b = bitrate { logger.info("- Bitrate: \(b) kbps") }
+        if let sr = sampleRate { logger.info("- Sample rate: \(Int(sr)) Hz") }
+        if vbr { logger.info("- VBR: enabled (AAC)") }
 
         let processManager = ProcessManager()
         let processes: [RecorderProcessInfo]
@@ -180,6 +241,31 @@ public struct AudioRecorderCLI: ParsableCommand {
         }
 
         dispatchMain()
+    }
+}
+
+public enum CompressionQuality: String, CaseIterable, ExpressibleByArgument {
+    case low
+    case medium
+    case high
+    case maximum
+
+    public var bitrate: UInt32 {
+        switch self {
+        case .low: return 64
+        case .medium: return 128
+        case .high: return 192
+        case .maximum: return 256
+        }
+    }
+
+    public var description: String {
+        switch self {
+        case .low: return "Low (64 kbps) - Maximum compression"
+        case .medium: return "Medium (128 kbps) - Balanced quality/size"
+        case .high: return "High (192 kbps) - High quality"
+        case .maximum: return "Maximum (256 kbps) - Near-transparent quality"
+        }
     }
 }
 
