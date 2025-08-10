@@ -1,5 +1,4 @@
 @preconcurrency import AVFoundation
-@preconcurrency import AudioToolbox
 import Foundation
 import ScreenCaptureKit
 import AppKit
@@ -27,15 +26,14 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     // Synchronization for multichannel writing
     private let writeQueue = DispatchQueue(label: "audio.capturer.write")
     private var writeTimer: DispatchSourceTimer?
-    private let writeInterval: TimeInterval = 0.005 // Write every 5ms (240 samples at 48kHz) for smoother output
+    private let writeInterval: TimeInterval = 0.005 // Write every 5ms (240 samples at 48kHz)
     
     // Ring buffers for accumulating audio
     private var processRingBuffer: RingBuffer?
     private var inputRingBuffers: [Int: RingBuffer] = [:]
     
-    private var extAudioFile: ExtAudioFileRef?
     private let alacEnabled: Bool
-    private var alacWriteAvgMs: Double = 0
+    private var writeAvgMs: Double = 0
 
     public init(
         permissionManager: PermissionManaging = PermissionManager(),
@@ -110,28 +108,28 @@ extension AudioCapturer {
         // Choose extension based on ALAC preference
         let outExt = alacEnabled ? "m4a" : "caf"
         self.outputURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: outExt))
-        if let url = self.outputURL {
-            logger?.info("- Output file: \(url.path)")
-        }
+        if let url = self.outputURL { logger?.info("- Output file: \(url.path)") }
 
         // Open writer
         if captureInputsEnabled {
-            // Multi-channel path (8ch)
+            // Multi-channel path (8ch) using AVAudioFile for both CAF and ALAC
+            guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
             if alacEnabled {
-                // Use AVAudioFile with ALAC settings; assemble buffers and write
-                guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
                 do {
                     let cfg = ALACConfiguration(sampleRate: 48_000, channelCount: 8, bitDepth: 16, quality: .max)
                     let settings = try ALACConfigurator.alacSettings(for: cfg)
                     self.outputFile = try AVAudioFile(forWriting: url, settings: settings)
                 } catch {
-                    // Fallback to CAF ExtAudioFile
-                    try openCAFMultichannelWriter(url: dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf")))
+                    // Fallback to CAF Float32 non-interleaved
+                    let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 8, interleaved: false)!
+                    let fallbackURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf"))
+                    self.outputURL = fallbackURL
+                    self.outputFile = try AVAudioFile(forWriting: fallbackURL, settings: fmt.settings)
                 }
             } else {
-                // CAF multichannel via ExtAudioFile
-                guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
-                try openCAFMultichannelWriter(url: url)
+                // CAF Float32 non-interleaved
+                let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 8, interleaved: false)!
+                self.outputFile = try AVAudioFile(forWriting: url, settings: fmt.settings)
             }
             // Initialize ring buffers (1 second capacity)
             let bufferCapacity = 48_000
@@ -144,14 +142,13 @@ extension AudioCapturer {
         } else {
             // Mono path
             if alacEnabled {
-                // ALAC mono via AVAudioFile
                 guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
                 do {
                     let cfg = ALACConfiguration(sampleRate: 48_000, channelCount: 1, bitDepth: 16, quality: .max)
                     let settings = try ALACConfigurator.alacSettings(for: cfg)
                     self.outputFile = try AVAudioFile(forWriting: url, settings: settings)
                 } catch {
-                    // Fallback to mono CAF via AVAudioFile
+                    // Fallback to mono CAF
                     let fallbackURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf"))
                     let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
                     self.outputURL = fallbackURL
@@ -170,47 +167,11 @@ extension AudioCapturer {
         self.recordingTimer = nil
     }
 
-    private func openCAFMultichannelWriter(url: URL) throws {
-        var dst = AudioStreamBasicDescription(
-            mSampleRate: 48_000,
-            mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
-            mBytesPerPacket: 8 * 4,
-            mFramesPerPacket: 1,
-            mBytesPerFrame: 8 * 4,
-            mChannelsPerFrame: 8,
-            mBitsPerChannel: 32,
-            mReserved: 0
-        )
-        var ref: ExtAudioFileRef? = nil
-        let status = ExtAudioFileCreateWithURL(url as CFURL, kAudioFileCAFType, &dst, nil, AudioFileFlags.eraseFile.rawValue, &ref)
-        guard status == noErr, let extRef = ref else {
-            throw AudioRecorderError.fileSystemError("Failed to create CAF file at \(url.path), status=\(status)")
-        }
-        var client = AudioStreamBasicDescription(
-            mSampleRate: 48_000,
-            mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
-            mBytesPerPacket: 4,
-            mFramesPerPacket: 1,
-            mBytesPerFrame: 4,
-            mChannelsPerFrame: 8,
-            mBitsPerChannel: 32,
-            mReserved: 0
-        )
-        let set = ExtAudioFileSetProperty(extRef, kExtAudioFileProperty_ClientDataFormat, UInt32(MemoryLayout<AudioStreamBasicDescription>.size), &client)
-        if set != noErr { ExtAudioFileDispose(extRef); throw AudioRecorderError.fileSystemError("Failed to set client format, status=\(set)") }
-        self.extAudioFile = extRef
-        self.outputURL = url
-    }
-
     public func stopCapture() {
         recordingTimer?.stop()
         recordingTimer = nil
         
-        if captureInputsEnabled {
-            stopWriteTimer()
-        }
+        if captureInputsEnabled { stopWriteTimer() }
         
         stream?.stopCapture { [weak self] error in
             if let error = error {
@@ -219,18 +180,9 @@ extension AudioCapturer {
         }
         stream = nil
         
-        if let url = self.outputURL {
-            delegate?.didStopRecording(outputFileURL: url)
-        }
+        if let url = self.outputURL { delegate?.didStopRecording(outputFileURL: url) }
         
-        if let ext = extAudioFile {
-            ExtAudioFileDispose(ext)
-            self.extAudioFile = nil
-        }
-        
-        if let file = outputFile {
-            outputFile = nil
-        }
+        outputFile = nil
         
         // Clean up ring buffers
         processRingBuffer = nil
@@ -276,7 +228,7 @@ public extension AudioCapturer {
         }
         
         // Ensure multichannel file grows even if SC audio is silent by triggering a write
-        if extAudioFile != nil || (alacEnabled && outputFile != nil && extAudioFile == nil) {
+        if outputFile != nil {
             writeQueue.async { [weak self] in
                 self?.writeAudioFrame()
             }
@@ -301,78 +253,51 @@ private extension AudioCapturer {
     }
     
     func writeAudioFrame() {
+        guard let file = self.outputFile else { return }
         let framesToWrite = Int(writeInterval * 48_000)
         
-        if alacEnabled, let file = self.outputFile, extAudioFile == nil {
-            // Assemble AVAudioPCMBuffer with 8 channels and write via AVAudioFile (ALAC)
-            var asbd = AudioStreamBasicDescription(
-                mSampleRate: 48_000,
-                mFormatID: kAudioFormatLinearPCM,
-                mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
-                mBytesPerPacket: 4,
-                mFramesPerPacket: 1,
-                mBytesPerFrame: 4,
-                mChannelsPerFrame: 8,
-                mBitsPerChannel: 32,
-                mReserved: 0
-            )
-            guard let fmt = AVAudioFormat(streamDescription: &asbd),
-                  let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(framesToWrite)) else { return }
-            buf.frameLength = AVAudioFrameCount(framesToWrite)
-            guard let channels = buf.floatChannelData else { return }
-            // Channel 1: Process
-            if let ringBuffer = self.processRingBuffer {
-                _ = ringBuffer.read(into: channels[0], frameCount: framesToWrite)
+        // Assemble 8-channel Float32 non-interleaved buffer
+        var asbd = AudioStreamBasicDescription(
+            mSampleRate: 48_000,
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
+            mBytesPerPacket: 4,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 4,
+            mChannelsPerFrame: 8,
+            mBitsPerChannel: 32,
+            mReserved: 0
+        )
+        guard let fmt = AVAudioFormat(streamDescription: &asbd),
+              let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(framesToWrite)) else { return }
+        buf.frameLength = AVAudioFrameCount(framesToWrite)
+        guard let channels = buf.floatChannelData else { return }
+        // Channel 1: Process
+        if let ringBuffer = self.processRingBuffer {
+            _ = ringBuffer.read(into: channels[0], frameCount: framesToWrite)
+        } else {
+            memset(channels[0], 0, framesToWrite * MemoryLayout<Float>.size)
+        }
+        // Channels 2-8: Inputs
+        for channel in 2...8 {
+            if let ringBuffer = self.inputRingBuffers[channel] {
+                _ = ringBuffer.read(into: channels[channel-1], frameCount: framesToWrite)
             } else {
-                memset(channels[0], 0, framesToWrite * MemoryLayout<Float>.size)
-            }
-            // Channels 2-8: Inputs
-            for channel in 2...8 {
-                if let ringBuffer = self.inputRingBuffers[channel] {
-                    _ = ringBuffer.read(into: channels[channel-1], frameCount: framesToWrite)
-                } else {
-                    memset(channels[channel-1], 0, framesToWrite * MemoryLayout<Float>.size)
-                }
-            }
-            let start = mach_absolute_time()
-            do {
-                try file.write(from: buf)
-            } catch {
-                // Fallback to CAF ext writer if ALAC write fails mid-session
-                if let url = self.outputURL {
-                    do { try openCAFMultichannelWriter(url: url.deletingPathExtension().appendingPathExtension("caf")) } catch { }
-                }
-            }
-            let end = mach_absolute_time()
-            // Update simple moving average (scaled to ms) using mach timebase
-            var timebase = mach_timebase_info_data_t()
-            mach_timebase_info(&timebase)
-            let ns = (end - start) * UInt64(timebase.numer) / UInt64(timebase.denom)
-            let ms = Double(ns) / 1_000_000.0
-            alacWriteAvgMs = (alacWriteAvgMs * 0.9) + (ms * 0.1)
-            return
-        }
-        
-        guard let ext = self.extAudioFile else { return }
-        
-        withTemporaryABL(channelCount: 8, frames: framesToWrite) { abl, channels in
-            // Channel 1: Process audio
-            if let ringBuffer = self.processRingBuffer {
-                _ = ringBuffer.read(into: channels[0], frameCount: framesToWrite)
-            }
-            
-            // Channels 2-8: Input devices
-            for channel in 2...8 {
-                if let ringBuffer = self.inputRingBuffers[channel] {
-                    _ = ringBuffer.read(into: channels[channel-1], frameCount: framesToWrite)
-                }
-            }
-            
-            let status = ExtAudioFileWrite(ext, UInt32(framesToWrite), abl)
-            if status != noErr {
-                self.delegate?.didEncounterError(.fileSystemError("ExtAudioFileWrite failed: \(status)"))
+                memset(channels[channel-1], 0, framesToWrite * MemoryLayout<Float>.size)
             }
         }
+        let start = mach_absolute_time()
+        do {
+            try file.write(from: buf)
+        } catch {
+            delegate?.didEncounterError(.fileSystemError("AVAudioFile write failed: \(error.localizedDescription)"))
+        }
+        let end = mach_absolute_time()
+        var timebase = mach_timebase_info_data_t()
+        mach_timebase_info(&timebase)
+        let ns = (end - start) * UInt64(timebase.numer) / UInt64(timebase.denom)
+        let ms = Double(ns) / 1_000_000.0
+        writeAvgMs = (writeAvgMs * 0.9) + (ms * 0.1)
     }
     
     func preferredDisplay(from displays: [SCDisplay]) -> SCDisplay? {
@@ -381,45 +306,11 @@ private extension AudioCapturer {
         }
         return displays.first
     }
-
-    // Allocate a non-interleaved AudioBufferList with given channels and frames, zero-filled, and provide per-channel pointers
-    func withTemporaryABL(channelCount: Int, frames: Int, _ body: (_ abl: UnsafePointer<AudioBufferList>, _ channels: [UnsafeMutablePointer<Float>]) -> Void) {
-        let ablSize = MemoryLayout<AudioBufferList>.size + (channelCount - 1) * MemoryLayout<AudioBuffer>.size
-        let raw = UnsafeMutableRawPointer.allocate(byteCount: ablSize, alignment: MemoryLayout<AudioBufferList>.alignment)
-        raw.initializeMemory(as: UInt8.self, repeating: 0, count: ablSize)
-        let ablPtr = raw.bindMemory(to: AudioBufferList.self, capacity: 1)
-
-        var chanPtrs: [UnsafeMutablePointer<Float>] = []
-        chanPtrs.reserveCapacity(channelCount)
-        for _ in 0..<channelCount {
-            let p = UnsafeMutablePointer<Float>.allocate(capacity: frames)
-            p.initialize(repeating: 0, count: frames)
-            chanPtrs.append(p)
-        }
-        ablPtr.pointee.mNumberBuffers = UInt32(channelCount)
-        let bufList = UnsafeMutableAudioBufferListPointer(ablPtr)
-        for i in 0..<channelCount {
-            bufList[i].mNumberChannels = 1
-            bufList[i].mDataByteSize = UInt32(frames * MemoryLayout<Float>.size)
-            bufList[i].mData = UnsafeMutableRawPointer(chanPtrs[i])
-        }
-        body(UnsafePointer(ablPtr), chanPtrs)
-        for p in chanPtrs { p.deallocate() }
-        raw.deallocate()
-    }
 }
 
 // Add InputDeviceManagerDelegate conformance
 extension AudioCapturer: InputDeviceManagerDelegate {
-    public func deviceConnected(_ device: AudioInputDevice, assignedToChannel channel: Int) {
-        // Log device connection
-    }
-    
-    public func deviceDisconnected(_ device: AudioInputDevice, fromChannel channel: Int) {
-        // Log device disconnection
-    }
-    
-    public func audioDataReceived(from device: AudioInputDevice, buffer: AVAudioPCMBuffer) {
-        receiveInputAudio(from: device, buffer: buffer)
-    }
+    public func deviceConnected(_ device: AudioInputDevice, assignedToChannel channel: Int) { }
+    public func deviceDisconnected(_ device: AudioInputDevice, fromChannel channel: Int) { }
+    public func audioDataReceived(from device: AudioInputDevice, buffer: AVAudioPCMBuffer) { receiveInputAudio(from: device, buffer: buffer) }
 }

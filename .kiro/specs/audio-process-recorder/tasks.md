@@ -302,7 +302,7 @@
   - This guarantees file growth driven by input devices
   - Run all tests and ensure they pass
 
-- [ ] 33. Switch multichannel CAF writing to AVAudioFile (simpler and reliable)
+- [x] 33. Switch multichannel CAF writing to AVAudioFile (simpler and reliable)
 
   - Replace ExtAudioFile-based writes with `AVAudioFile` opened on an 8-ch Float32 non-interleaved CAF
   - Write the assembled buffers via `AVAudioFile.write(from:)` in both SC and input paths
