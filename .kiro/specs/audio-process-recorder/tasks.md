@@ -372,7 +372,7 @@
   - Implement format conversion utilities for PCM-to-ALAC encoding preparation
   - Write unit tests for ALAC format configuration and constraint validation
 
-- [ ] 40. Enhance FileController for ALAC file creation and management
+- [x] 40. Enhance FileController for ALAC file creation and management
 
   - Add ALAC file creation methods using AVAudioFile with ALAC settings
   - Implement ALAC-specific filename generation with .m4a extension for better compatibility

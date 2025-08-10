@@ -49,7 +49,7 @@ public final class FileController: FileControllerProtocol {
     public func writeChannelMappingLog(_ mappingJSON: Data, to directory: String, baseFilename: String) throws -> URL {
         let dirURL = expandTilde(in: directory)
         let jsonName: String
-        if baseFilename.lowercased().hasSuffix(".wav") || baseFilename.lowercased().hasSuffix(".caf") {
+        if baseFilename.lowercased().hasSuffix(".wav") || baseFilename.lowercased().hasSuffix(".caf") || baseFilename.lowercased().hasSuffix(".m4a") {
             jsonName = String(baseFilename.dropLast(4)) + "-channels.json"
         } else {
             jsonName = baseFilename + "-channels.json"
@@ -102,7 +102,43 @@ public final class FileController: FileControllerProtocol {
             throw AudioRecorderError.fileSystemError(error.localizedDescription)
         }
     }
-    
+
+    // MARK: - ALAC (.m4a)
+    public func createALACFile(in directory: String, config: ALACConfiguration) throws -> AVAudioFile {
+        let dirURL = expandTilde(in: directory)
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename(extension: "m4a"))
+        let settings = try ALACConfigurator.alacSettings(for: config)
+        do {
+            return try AVAudioFile(forWriting: fileURL, settings: settings)
+        } catch {
+            throw AudioRecorderError.fileSystemError(error.localizedDescription)
+        }
+    }
+
+    public func writeALACBuffer(_ buffer: AVAudioPCMBuffer, to directory: String, config: ALACConfiguration) throws -> URL {
+        do {
+            let file = try createALACFile(in: directory, config: config)
+            try file.write(from: buffer)
+            return file.url
+        } catch {
+            // Fallback to uncompressed CAF if ALAC fails
+            return try writeCAFBuffer(buffer, to: directory)
+        }
+    }
+
+    public func writeALACMultiChannelBuffer(_ buffer: AVAudioPCMBuffer, to directory: String, config: ALACConfiguration) throws -> URL {
+        return try writeALACBuffer(buffer, to: directory, config: config)
+    }
+
+    public func compressionStats(originalBytes: Int64, compressedFileURL: URL) -> (compressedBytes: Int64, ratio: Double) {
+        let size = (try? compressedFileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        let compressed = Int64(size)
+        guard originalBytes > 0 else { return (compressed, 0.0) }
+        let ratio = 1.0 - Double(compressed) / Double(originalBytes)
+        return (compressed, ratio)
+    }
+
     // MARK: - Helpers
     public func defaultOutputDirectory() -> URL {
         let docs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents", isDirectory: true)
