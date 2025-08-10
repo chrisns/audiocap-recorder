@@ -190,6 +190,13 @@ public struct AudioRecorderCLI: ParsableCommand {
 
         capturer.setOutputDirectory(outputDirectory)
 
+        // Bridge CLI lossy options to capturer via environment flags (internal)
+        if enableAAC { setenv("AUDIOCAP_ENABLE_LOSSY_AAC", "1", 1) }
+        if enableMP3 { setenv("AUDIOCAP_ENABLE_LOSSY_MP3", "1", 1) }
+        if let b = bitrate { setenv("AUDIOCAP_BITRATE", String(b), 1) }
+        if let sr = sampleRate { setenv("AUDIOCAP_SAMPLE_RATE", String(Int(sr)), 1) }
+        if vbr { setenv("AUDIOCAP_VBR", "1", 1) }
+
         // Optional ALAC performance reporter (verbose only)
         var perfTimer: DispatchSourceTimer? = nil
         if enableALAC && verbose {

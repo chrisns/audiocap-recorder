@@ -106,7 +106,7 @@
   - Write unit tests for real-time monitoring and progress reporting
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 11. Integrate lossy compression with existing recording workflows
+- [x] 11. Integrate lossy compression with existing recording workflows
 
   - Modify AudioCapturer to support lossy compression alongside existing ALAC and uncompressed options
   - Integrate CompressionController with main application lifecycle and recording session management
