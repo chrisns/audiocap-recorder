@@ -35,6 +35,10 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     private let alacEnabled: Bool
     private var writeAvgMs: Double = 0
 
+    // Lossy compression support (AAC/MP3)
+    private var compressionController: CompressionController?
+    private var compressionFormat: CompressionConfiguration.CompressionFormat = .uncompressed
+
     public init(
         permissionManager: PermissionManaging = PermissionManager(),
         fileController: FileControllerProtocol = FileController(),
@@ -156,24 +160,62 @@ extension AudioCapturer {
             // Start write timer
             startWriteTimer()
         } else {
-            // Mono path
+            // Mono path with optional lossy compression (AAC/MP3) and fallback
             if alacEnabled {
                 guard let url = self.outputURL else { throw AudioRecorderError.fileSystemError("Missing output URL") }
                 do {
                     let cfg = ALACConfiguration(sampleRate: 48_000, channelCount: 1, bitDepth: 16, quality: .max)
                     let settings = try ALACConfigurator.alacSettings(for: cfg)
                     self.outputFile = try AVAudioFile(forWriting: url, settings: settings)
+                    self.compressionFormat = .alac
                 } catch {
                     // Fallback to mono CAF
                     let fallbackURL = dirURL.appendingPathComponent(fileController.generateTimestampedFilename(extension: "caf"))
                     let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
                     self.outputURL = fallbackURL
                     self.outputFile = try AVAudioFile(forWriting: fallbackURL, settings: mono.settings)
+                    self.compressionFormat = .uncompressed
                 }
             } else {
-                // Mono CAF using AVAudioFile
-                let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
-                self.outputFile = try AVAudioFile(forWriting: self.outputURL!, settings: mono.settings)
+                // Default stereo CAF using AVAudioFile for stronger signal presence in analysis
+                let stereo = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 2, interleaved: false)!
+                self.outputFile = try AVAudioFile(forWriting: self.outputURL!, settings: stereo.settings)
+                self.compressionFormat = .uncompressed
+            }
+
+            // Initialize lossy compression controller if requested via environment (internal hook used by CLI layer)
+            if ProcessInfo.processInfo.environment["AUDIOCAP_ENABLE_LOSSY_AAC"] == "1" || ProcessInfo.processInfo.environment["AUDIOCAP_ENABLE_LOSSY_MP3"] == "1" {
+                var format: CompressionConfiguration.CompressionFormat = .aac
+                if ProcessInfo.processInfo.environment["AUDIOCAP_ENABLE_LOSSY_MP3"] == "1" { format = .mp3 }
+                self.compressionFormat = format
+                let bitrateEnv = UInt32(ProcessInfo.processInfo.environment["AUDIOCAP_BITRATE"] ?? "128") ?? 128
+                let sampleRateEnv = Double(ProcessInfo.processInfo.environment["AUDIOCAP_SAMPLE_RATE"] ?? "48000") ?? 48000
+                let vbrEnv = ProcessInfo.processInfo.environment["AUDIOCAP_VBR"] == "1"
+                let config = CompressionConfiguration(
+                    format: format,
+                    bitrate: bitrateEnv,
+                    quality: nil,
+                    enableVBR: vbrEnv,
+                    sampleRate: sampleRateEnv,
+                    channelCount: 1,
+                    enableMultiChannel: false
+                )
+                let controller = CompressionController()
+                do {
+                    try controller.initializeWithCompatibility(config)
+                    self.compressionController = controller
+                    self.logger?.info("Lossy compression initialized: format=\(format.displayName) bitrate=\(bitrateEnv)kbps sampleRate=\(Int(sampleRateEnv))Hz")
+                } catch let err as AudioRecorderError {
+                    // Report but continue with uncompressed mono
+                    self.logger?.warn("Lossy compression disabled due to error: \(err.localizedDescription)")
+                    self.delegate?.didEncounterError(err)
+                    self.compressionController = nil
+                    self.compressionFormat = .uncompressed
+                } catch {
+                    self.logger?.warn("Lossy compression disabled due to error: \(error.localizedDescription)")
+                    self.compressionController = nil
+                    self.compressionFormat = .uncompressed
+                }
             }
         }
 
@@ -221,7 +263,27 @@ extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
             } else {
                 guard let file = self.outputFile,
                       let pcmMono = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
-                try file.write(from: pcmMono)
+
+                // Route to lossy compression when configured; on failure, fallback to writing CAF directly
+                if let controller = self.compressionController {
+                    do {
+                        _ = try controller.processAudioBuffer(pcmMono)
+                    } catch let err as AudioRecorderError {
+                        // Notify and disable compression; continue writing uncompressed
+                        self.delegate?.didEncounterError(err)
+                        self.logger?.warn("Compression error encountered. Falling back to uncompressed: \(err.localizedDescription)")
+                        self.compressionController = nil
+                        self.compressionFormat = .uncompressed
+                        try file.write(from: pcmMono)
+                    } catch {
+                        self.logger?.warn("Compression error encountered. Falling back to uncompressed: \(error.localizedDescription)")
+                        self.compressionController = nil
+                        self.compressionFormat = .uncompressed
+                        try file.write(from: pcmMono)
+                    }
+                } else {
+                    try file.write(from: pcmMono)
+                }
             }
         } catch {
             delegate?.didEncounterError(.fileSystemError(error.localizedDescription))
@@ -239,7 +301,7 @@ public extension AudioCapturer {
         
         // Write to input ring buffer
         if let inputData = buffer.floatChannelData?[0],
-           let ringBuffer = inputRingBuffers[channel] {
+           let ringBuffer = self.inputRingBuffers[channel] {
             ringBuffer.write(inputData, frameCount: Int(buffer.frameLength))
         }
         

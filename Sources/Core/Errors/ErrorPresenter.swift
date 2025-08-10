@@ -31,11 +31,11 @@ public struct ErrorPresenter {
         case .alacEncodingFailed(let message):
             return "ALAC encoding failed: \(message). The recorder will fall back to uncompressed CAF."
         case .compressionNotSupported(let reason):
-            return "Compression not supported: \(reason). Try a different format or disable compression."
+            return "Compression not supported: \(reason). Try a different format (e.g., --aac) or disable compression to use uncompressed CAF."
         case .compressionConfigurationInvalid(let reason):
-            return "Invalid compression configuration: \(reason). Review your --aac/--mp3/--bitrate/--quality options."
+            return "Invalid compression configuration: \(reason). Review your --aac/--mp3/--bitrate/--quality/--sample-rate options."
         case .compressionEncodingFailed(let reason):
-            return "Compression encoding failed: \(reason). The recorder may fall back to uncompressed output."
+            return "Compression encoding failed: \(reason). The recorder will fall back to uncompressed output when possible."
         }
     }
 }

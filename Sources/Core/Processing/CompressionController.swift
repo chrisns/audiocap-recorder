@@ -11,6 +11,24 @@ final class CompressionController {
         self.engine = try makeEngine(for: config)
     }
 
+    // New convenience that performs compatibility validation/sanitization before creating an engine
+    func initializeWithCompatibility(_ config: CompressionConfiguration) throws {
+        let fallback = CompressionFallbackManager()
+        // Validate eagerly, but allow sanitization path if invalid
+        do {
+            try fallback.validateCompatibility(for: config)
+            self.configuration = config
+        } catch {
+            // Try sanitizing and re-validating
+            let sanitized = fallback.sanitizeConfiguration(config)
+            try fallback.validateCompatibility(for: sanitized)
+            self.configuration = sanitized
+        }
+        if let cfg = self.configuration {
+            self.engine = try makeEngine(for: cfg)
+        }
+    }
+
     func processAudioBuffer(_ buffer: AVAudioPCMBuffer) throws -> Data? {
         guard let engine = engine else { return nil }
         return try engine.processAudioBuffer(buffer)
@@ -56,9 +74,9 @@ final class CompressionController {
     private func makeEngine(for config: CompressionConfiguration) throws -> CompressionEngineProtocol {
         switch config.format {
         case .aac:
-            return AACCompressionEngineStub(configuration: config)
+            return try LossyCompressionEngine(configuration: config)
         case .mp3:
-            return MP3CompressionEngineStub(configuration: config)
+            return try LossyCompressionEngine(configuration: config)
         case .alac:
             return ALACCompressionEngineStub(configuration: config)
         case .uncompressed:

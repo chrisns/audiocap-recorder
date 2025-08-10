@@ -115,4 +115,30 @@ final class CompressionControllerTests: XCTestCase {
         let fmt = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!
         _ = try ctrl.createOutputFile(at: fileURL, format: fmt)
     }
+
+    func testInitializeWithCompatibilitySanitizesAndCreatesEngine() throws {
+        let ctrl = CompressionController()
+        // Intentionally invalid: bitrate too low and invalid sample rate; should be clamped/sanitized
+        let bad = CompressionConfiguration(
+            format: .aac,
+            bitrate: 32,
+            quality: nil,
+            enableVBR: true,
+            sampleRate: 12345,
+            channelCount: 2,
+            enableMultiChannel: false
+        )
+        XCTAssertNoThrow(try ctrl.initializeWithCompatibility(bad))
+        // Now MP3 with invalid params should end up sanitized to stereo, no VBR
+        let badMP3 = CompressionConfiguration(
+            format: .mp3,
+            bitrate: 512,
+            quality: nil,
+            enableVBR: true,
+            sampleRate: 96000,
+            channelCount: 6,
+            enableMultiChannel: true
+        )
+        XCTAssertNoThrow(try ctrl.initializeWithCompatibility(badMP3))
+    }
 }
