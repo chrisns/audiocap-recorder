@@ -118,24 +118,27 @@ public final class AudioProcessor: AudioProcessorProtocol {
         guard totalChannels >= 2 else { return nil }
         let sampleRate = processAudio.format.sampleRate
 
-        var format: AVAudioFormat?
-        if let layout = AVAudioChannelLayout(layoutTag: kAudioChannelLayoutTag_DiscreteInOrder | (UInt32(totalChannels) << 16)) {
-            format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, interleaved: false, channelLayout: layout)
-        }
-        if format == nil {
-            format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: AVAudioChannelCount(totalChannels), interleaved: false)
-        }
-        guard let fmt = format else { return nil }
+        // Build explicit ASBD for Float32 non-interleaved N-channel
+        var asbd = AudioStreamBasicDescription(
+            mSampleRate: sampleRate,
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
+            mBytesPerPacket: 4,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 4,
+            mChannelsPerFrame: UInt32(totalChannels),
+            mBitsPerChannel: 32,
+            mReserved: 0
+        )
+        guard let fmt = AVAudioFormat(streamDescription: &asbd) else { return nil }
 
         let frames = processAudio.frameLength
-        guard let out = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frames) else { return nil }
+        guard frames > 0, let out = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frames) else { return nil }
         out.frameLength = frames
         guard let outCh = out.floatChannelData else { return nil }
 
         let framesInt = Int(frames)
-        for c in 0..<totalChannels {
-            memset(outCh[c], 0, framesInt * MemoryLayout<Float>.size)
-        }
+        for c in 0..<totalChannels { memset(outCh[c], 0, framesInt * MemoryLayout<Float>.size) }
 
         if let procCh = processAudio.floatChannelData {
             let count = min(framesInt, Int(processAudio.frameLength))

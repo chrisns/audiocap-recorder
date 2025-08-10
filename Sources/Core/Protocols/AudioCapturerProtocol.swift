@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 public protocol AudioCapturerDelegate: AnyObject {
     func didStartRecording()
@@ -11,4 +12,6 @@ public protocol AudioCapturerProtocol {
     func startCapture(for processes: [RecorderProcessInfo]) async throws
     func stopCapture()
     var delegate: AudioCapturerDelegate? { get set }
+
+    func receiveInputAudio(from device: AudioInputDevice, buffer: AVAudioPCMBuffer)
 }

@@ -3,7 +3,7 @@ import AVFoundation
 
 public protocol FileControllerProtocol {
     func createOutputDirectory(_ path: String) throws
-    func generateTimestampedFilename() -> String
+    func generateTimestampedFilename(extension ext: String) -> String
     func writeAudioData(_ data: Data, to directory: String) throws -> URL
     func defaultOutputDirectory() -> URL
 
@@ -11,4 +11,5 @@ public protocol FileControllerProtocol {
     func writeChannelMappingLog(_ mappingJSON: Data, to directory: String, baseFilename: String) throws -> URL
 
     func writeWAVBuffer(_ buffer: AVAudioPCMBuffer, to directory: String, bitDepth: Int) throws -> URL
+    func writeCAFBuffer(_ buffer: AVAudioPCMBuffer, to directory: String) throws -> URL
 }

@@ -13,17 +13,17 @@ public final class FileController: FileControllerProtocol {
         }
     }
 
-    public func generateTimestampedFilename() -> String {
+    public func generateTimestampedFilename(extension ext: String) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone.current
         formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
-        return formatter.string(from: Date()) + ".wav"
+        return formatter.string(from: Date()) + "." + ext
     }
 
     public func writeAudioData(_ data: Data, to directory: String) throws -> URL {
         let dirURL = expandTilde(in: directory)
-        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename())
+        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename(extension: "caf"))
         do {
             try data.write(to: fileURL, options: .atomic)
             return fileURL
@@ -32,7 +32,7 @@ public final class FileController: FileControllerProtocol {
             let fallbackDir = defaultOutputDirectory()
             do {
                 try FileManager.default.createDirectory(at: fallbackDir, withIntermediateDirectories: true)
-                let fallbackURL = fallbackDir.appendingPathComponent(generateTimestampedFilename())
+                let fallbackURL = fallbackDir.appendingPathComponent(generateTimestampedFilename(extension: "caf"))
                 try data.write(to: fallbackURL, options: .atomic)
                 return fallbackURL
             } catch {
@@ -42,14 +42,14 @@ public final class FileController: FileControllerProtocol {
     }
 
     public func writeMultiChannelAudioData(_ data: Data, to directory: String) throws -> URL {
-        // Reuse the same filename generation; content is multi-channel WAV data
+        // Reuse the same filename generation; content is multi-channel audio data
         return try writeAudioData(data, to: directory)
     }
 
     public func writeChannelMappingLog(_ mappingJSON: Data, to directory: String, baseFilename: String) throws -> URL {
         let dirURL = expandTilde(in: directory)
         let jsonName: String
-        if baseFilename.lowercased().hasSuffix(".wav") {
+        if baseFilename.lowercased().hasSuffix(".wav") || baseFilename.lowercased().hasSuffix(".caf") {
             jsonName = String(baseFilename.dropLast(4)) + "-channels.json"
         } else {
             jsonName = baseFilename + "-channels.json"
@@ -67,7 +67,7 @@ public final class FileController: FileControllerProtocol {
     public func writeWAVBuffer(_ buffer: AVAudioPCMBuffer, to directory: String, bitDepth: Int) throws -> URL {
         let dirURL = expandTilde(in: directory)
         try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
-        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename())
+        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename(extension: "wav"))
 
         // Build settings enforcing linear PCM with specified bit depth
         var settings: [String: Any] = [:]
@@ -88,6 +88,21 @@ public final class FileController: FileControllerProtocol {
         }
     }
 
+    public func writeCAFBuffer(_ buffer: AVAudioPCMBuffer, to directory: String) throws -> URL {
+        let dirURL = expandTilde(in: directory)
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        let fileURL = dirURL.appendingPathComponent(generateTimestampedFilename(extension: "caf"))
+        // Use buffer's format; AVAudioFile will choose CAF based on extension
+        let settings = buffer.format.settings
+        do {
+            let outFile = try AVAudioFile(forWriting: fileURL, settings: settings)
+            try outFile.write(from: buffer)
+            return fileURL
+        } catch {
+            throw AudioRecorderError.fileSystemError(error.localizedDescription)
+        }
+    }
+    
     // MARK: - Helpers
     public func defaultOutputDirectory() -> URL {
         let docs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents", isDirectory: true)

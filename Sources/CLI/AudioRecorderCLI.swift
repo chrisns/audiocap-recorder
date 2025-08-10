@@ -39,8 +39,19 @@ public struct AudioRecorderCLI: ParsableCommand {
 
         if captureInputs {
             if !permissionManager.checkMicrophonePermission() {
-                permissionManager.displayPermissionInstructions(for: .microphone)
-                throw CleanExit.message("Microphone permission is required when using --capture-inputs. Please enable it and re-run.")
+                // Request mic permission interactively and wait for response
+                print("Requesting Microphone permission...")
+                let sema = DispatchSemaphore(value: 0)
+                var granted: Bool = false
+                permissionManager.requestMicrophonePermission { ok in
+                    granted = ok
+                    sema.signal()
+                }
+                _ = sema.wait(timeout: .now() + 60)
+                if !granted {
+                    permissionManager.displayPermissionInstructions(for: .microphone)
+                    throw CleanExit.message("Microphone permission is required when using --capture-inputs. Please enable it and re-run.")
+                }
             }
         }
 
@@ -76,12 +87,17 @@ public struct AudioRecorderCLI: ParsableCommand {
             }
         }
 
+        // Create capturer with knowledge of input capture
+        let capturer = AudioCapturer(permissionManager: permissionManager, fileController: FileController(), audioProcessor: AudioProcessor(), outputDirectoryPath: outputDirectory, captureInputsEnabled: captureInputs)
+
         // Optional input device manager lifecycle
         var inputManager: InputDeviceManager? = nil
+        var inputDelegate: CombinedInputDelegate? = nil  // Store delegate to keep it alive
         if captureInputs {
             let manager = InputDeviceManager()
             let reporter = InputStatusReporter(logger: logger)
-            manager.delegate = reporter
+            let combined = CombinedInputDelegate(reporter: reporter, capturer: capturer)
+            manager.delegate = combined
             let devices = manager.enumerateInputDevices()
             if devices.isEmpty {
                 logger.warn("No input devices detected. Proceeding with process audio only.")
@@ -95,9 +111,9 @@ public struct AudioRecorderCLI: ParsableCommand {
             manager.startMonitoring()
             manager.startCapturing()
             inputManager = manager
+            inputDelegate = combined  // Keep delegate alive
         }
 
-        let capturer = AudioCapturer(permissionManager: permissionManager)
         capturer.setOutputDirectory(outputDirectory)
 
         let shutdown = ShutdownCoordinator(audioCapturer: capturer, fileController: FileController())
@@ -155,6 +171,25 @@ final class InputStatusReporter: InputDeviceManagerDelegate {
     }
 
     func audioDataReceived(from device: AudioInputDevice, buffer: AVAudioPCMBuffer) {
-        // For Task 22, we only report status. Future tasks will combine into multi-channel output.
+        // status only
+    }
+}
+
+// Combined delegate forwards status logs and audio buffers to the capturer
+final class CombinedInputDelegate: InputDeviceManagerDelegate {
+    private let reporter: InputStatusReporter
+    private weak var capturer: AudioCapturer?
+    init(reporter: InputStatusReporter, capturer: AudioCapturer) {
+        self.reporter = reporter
+        self.capturer = capturer
+    }
+    func deviceConnected(_ device: AudioInputDevice, assignedToChannel channel: Int) {
+        reporter.deviceConnected(device, assignedToChannel: channel)
+    }
+    func deviceDisconnected(_ device: AudioInputDevice, fromChannel channel: Int) {
+        reporter.deviceDisconnected(device, fromChannel: channel)
+    }
+    func audioDataReceived(from device: AudioInputDevice, buffer: AVAudioPCMBuffer) {
+        capturer?.receiveInputAudio(from: device, buffer: buffer)
     }
 }

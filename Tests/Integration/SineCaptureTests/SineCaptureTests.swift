@@ -71,13 +71,13 @@ final class SineCaptureTests: XCTestCase {
 
         ensureUnderTimeout("after process termination")
 
-        // Find latest wav
+        // Find latest caf
         let files = try fm.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey], options: [.skipsHiddenFiles])
-        let wavs = files.filter { $0.pathExtension.lowercased() == "wav" }
-        if wavs.isEmpty {
-            throw XCTSkip("Recorder did not produce WAV (likely headless display or permissions). Skipping.")
+        let cafs = files.filter { $0.pathExtension.lowercased() == "caf" }
+        if cafs.isEmpty {
+            throw XCTSkip("Recorder did not produce CAF (likely headless display or permissions). Skipping.")
         }
-        let latest = wavs.sorted { (a,b) in
+        let latest = cafs.sorted { (a,b) in
             let da = (try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
             let db = (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
             return da < db

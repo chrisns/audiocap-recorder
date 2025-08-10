@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Audio Process Recorder is a command-line macOS application built with Swift that captures system audio using ScreenCaptureKit and filters it to record audio from specific processes identified by regular expression matching. The application leverages macOS Sequoia 15.6's ScreenCaptureKit framework to capture all system audio, then correlates this audio with target process activity to create filtered recordings. Additionally, the application can simultaneously capture all available audio input devices and combine them into an 8-channel WAV file, with process audio on channels 1-2 and input devices on channels 3-8, supporting hot-swapping of devices during recording.
+The Audio Process Recorder is a command-line macOS application built with Swift that captures system audio using ScreenCaptureKit and filters it to record audio from specific processes identified by regular expression matching. The application leverages macOS Sequoia 15.6's ScreenCaptureKit framework to capture all system audio, then correlates this audio with target process activity to create filtered recordings. Additionally, the application can simultaneously capture all available audio input devices and combine them into an 8-channel CAF file, with process audio on channels 1-2 and input devices on channels 3-8, supporting hot-swapping of devices during recording.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ graph TB
     IDM --> |Input Audio| AP
     AP --> |8-Channel Audio| FC
 
-    FC --> |WAV Files| FS[File System]
+    FC --> |CAF Files| FS[File System]
     FC --> |Channel Mapping| FS
 
     PM --> |Process Events| AC
@@ -38,7 +38,7 @@ graph TB
 3. **Audio Capturer** uses ScreenCaptureKit to capture system audio and correlates it with process activity
 4. **Input Device Manager** enumerates, monitors, and captures from all available audio input devices
 5. **Audio Processor** filters and mixes audio streams from target processes and combines with input device audio into 8-channel format
-6. **File Controller** manages 8-channel WAV file creation, channel mapping logs, directory structure, and timestamped naming
+6. **File Controller** manages 8-channel CAF file creation, channel mapping logs, directory structure, and timestamped naming
 
 ## Components and Interfaces
 
@@ -217,7 +217,7 @@ streamConfig.excludesCurrentProcessAudio = true
 - Filter audio based on process correlation data
 - Mix multiple process audio streams
 - Combine process audio with input device audio into 8-channel format
-- Convert multi-channel audio to WAV format for file output
+- Convert multi-channel audio for CAF file output
 
 **Key Methods:**
 
@@ -238,7 +238,7 @@ class AudioProcessor {
 4. Receive input device audio buffers mapped to channels 3-8
 5. Combine process audio and input device audio into single 8-channel buffer
 6. Apply sample rate conversion and format normalization
-7. Convert to 8-channel WAV format using Core Audio services
+7. Output as 8-channel CAF using AVAudioFile (Linear PCM)
 
 **Channel Assignment:**
 
@@ -252,7 +252,7 @@ class AudioProcessor {
 
 - Manage output directory creation and permissions
 - Generate timestamped filenames for audio and mapping files
-- Write 8-channel WAV data to files
+- Write 8-channel CAF data to files
 - Create and maintain channel mapping log files
 - Handle file system errors and disk space monitoring
 
@@ -290,7 +290,7 @@ struct DeviceEvent {
 
 **File Naming Convention:**
 
-- Audio files: `yyyy-MM-dd-HH-mm-ss.wav` (8-channel WAV)
+- Audio files: `yyyy-MM-dd-HH-mm-ss.caf` (8-channel CAF)
 - Channel mapping: `yyyy-MM-dd-HH-mm-ss-channels.json`
 - Default location: `~/Documents/audiocap/`
 - Automatic directory creation with proper permissions

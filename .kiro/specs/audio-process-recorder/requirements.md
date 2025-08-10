@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This feature involves creating a command-line macOS application that can record system audio output and filter it to capture audio from specific running processes or applications. The application will use ScreenCaptureKit to capture all system audio, identify target processes using regular expression matching against process names, correlate audio activity with process activity, and save the filtered recordings as WAV files with timestamped filenames to a configurable directory.
+This feature involves creating a command-line macOS application that can record system audio output and filter it to capture audio from specific running processes or applications. The application will use ScreenCaptureKit to capture all system audio, identify target processes using regular expression matching against process names, correlate audio activity with process activity, and save the filtered recordings as CAF files with timestamped filenames to a configurable directory.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ This feature involves creating a command-line macOS application that can record 
 
 #### Acceptance Criteria
 
-1. WHEN a recording starts THEN the system SHALL create a WAV file with the format "yyyy-mm-dd-hh-mm-ss.wav"
+1. WHEN a recording starts THEN the system SHALL create a CAF file with the format "yyyy-mm-dd-hh-mm-ss.caf"
 2. WHEN no output directory is specified THEN the system SHALL save files to "~/Documents/audiocap/"
 3. WHEN a custom output directory is specified THEN the system SHALL save files to the specified location
 4. WHEN the output directory doesn't exist THEN the system SHALL create the directory structure automatically
@@ -136,7 +136,7 @@ This feature involves creating a command-line macOS application that can record 
 #### Acceptance Criteria
 
 1. WHEN the --capture-inputs CLI option is provided THEN the system SHALL enumerate and capture from all available audio input devices
-2. WHEN audio input devices are captured THEN the system SHALL create an 8-channel WAV file with process audio on channels 1-2 and input devices on channels 3-8
+2. WHEN audio input devices are captured THEN the system SHALL create an 8-channel CAF file with process audio on channels 1-2 and input devices on channels 3-8
 3. WHEN fewer than 6 input devices are available THEN the system SHALL leave unused channels silent in the 8-channel file
 4. WHEN more than 6 input devices are available THEN the system SHALL capture the first 6 devices and log a warning about additional devices being ignored
 
@@ -159,7 +159,7 @@ This feature involves creating a command-line macOS application that can record 
 
 1. WHEN recording starts with input capture enabled THEN the system SHALL display a channel mapping showing which devices are assigned to channels 3-8
 2. WHEN device changes occur during recording THEN the system SHALL update and display the current channel mapping
-3. WHEN recording completes THEN the system SHALL save a channel mapping log file alongside the WAV file with device assignments and timing information
+3. WHEN recording completes THEN the system SHALL save a channel mapping log file alongside the CAF file with device assignments and timing information
 4. WHEN no input devices are available THEN the system SHALL clearly indicate that only process audio (channels 1-2) will be recorded
 
 ### Requirement 15

@@ -4,9 +4,9 @@ import AVFoundation
 
 final class CoreInterfacesTests: XCTestCase {
     func testGenerateTimestampedFilenameFormat() throws {
-        // Format: yyyy-MM-dd-HH-mm-ss.wav
+        // Format: yyyy-MM-dd-HH-mm-ss.<ext>
         let fc = TestFileController()
-        let name = fc.generateTimestampedFilename()
+        let name = fc.generateTimestampedFilename(extension: "wav")
         let pattern = #"^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.wav$"#
         XCTAssertNotNil(name.range(of: pattern, options: .regularExpression))
     }
@@ -14,13 +14,13 @@ final class CoreInterfacesTests: XCTestCase {
 
 private final class TestFileController: FileControllerProtocol {
     func createOutputDirectory(_ path: String) throws {}
-    func generateTimestampedFilename() -> String {
+    func generateTimestampedFilename(extension ext: String) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
-        return formatter.string(from: Date()) + ".wav"
+        return formatter.string(from: Date()) + "." + ext
     }
     func writeAudioData(_ data: Data, to directory: String) throws -> URL {
-        return URL(fileURLWithPath: directory).appendingPathComponent(generateTimestampedFilename())
+        return URL(fileURLWithPath: directory).appendingPathComponent(generateTimestampedFilename(extension: "caf"))
     }
     func defaultOutputDirectory() -> URL {
         return URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -32,6 +32,9 @@ private final class TestFileController: FileControllerProtocol {
         return URL(fileURLWithPath: directory).appendingPathComponent("test-channels.json")
     }
     func writeWAVBuffer(_ buffer: AVAudioPCMBuffer, to directory: String, bitDepth: Int) throws -> URL {
+        return try writeAudioData(Data(), to: directory)
+    }
+    func writeCAFBuffer(_ buffer: AVAudioPCMBuffer, to directory: String) throws -> URL {
         return try writeAudioData(Data(), to: directory)
     }
 }

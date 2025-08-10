@@ -257,3 +257,84 @@
   - Verify WAV file headers contain correct channel count, sample rate (48kHz), and bit depth (16-bit) metadata
   - Add automated test that fails if generated WAV file is not exactly 8 channels, ensuring regression prevention
   - _Requirements: 12.2, 12.3, 14.1, 14.2_
+
+- [x] 26. Fix output file extensions to WAV and ensure multichannel recording writes WAVE
+
+  - Update FileController to write `.wav` instead of `.caf` in `writeAudioData` and `writeMultiChannelAudioData`
+  - Ensure AudioCapturer uses `.wav` filenames
+  - Change ExtAudioFile creation to `kAudioFileWAVEType` and destination format to 8-ch 16-bit PCM, with non-interleaved float client format
+  - Run all tests and ensure they pass
+
+- [x] 27. Switch multichannel output to CAF and align tests with CAF
+
+  - Update FileController to write `.caf` for generic and multichannel data
+  - Update AudioCapturer to generate `.caf` filenames and use `kAudioFileCAFType`
+  - Configure CAF destination as 8-ch Float32 non-interleaved; client format matches for zero-copy
+  - Update tests to expect `.caf` filenames and mapping behavior
+  - Run all tests and ensure they pass
+
+- [x] 28. Eagerly create CAF file on start for -c to guarantee file presence
+
+  - Initialize `ExtAudioFile` in `AudioCapturer.startCapture` when `captureInputsEnabled == true`
+  - Use 8-ch Float32 non-interleaved destination and client formats
+  - Keep lazy path as fallback if needed; ensure dispose on stop
+  - Verify file is present even if no audio flows
+  - Run all tests and ensure they pass
+
+- [x] 28.1. Create CAF file before starting SC stream to guarantee immediate presence
+
+  - Move eager ExtAudioFile initialization to occur before `stream.startCapture()`
+  - Ensure directory exists and file creation succeeds irrespective of stream start
+  - Run all tests and ensure they pass
+ 
+- [ ] 31. Harden output directory creation and CAF creation with -c
+
+  - Replace silent directory creation with strict do/catch and fallback to default directory
+  - If both target and default directories fail, throw a file system error and exit
+  - On -c, if `ExtAudioFileCreateWithURL` fails, throw a file system error (do not continue)
+  - Log the chosen output directory and intended filename at start
+  - Run all tests and ensure they pass
+
+- [ ] 32. Write on input audio callbacks to ensure multichannel file grows even if SC audio is silent
+
+  - In `AudioCapturer.receiveInputAudio`, when -c is enabled and ExtAudioFile is open, compose an 8ch buffer with process channels zeroed and the device's channel filled, then write it
+  - Keep SC stream writes as-is for process audio
+  - This guarantees file growth driven by input devices
+  - Run all tests and ensure they pass
+
+- [ ] 33. Switch multichannel CAF writing to AVAudioFile (simpler and reliable)
+
+  - Replace ExtAudioFile-based writes with `AVAudioFile` opened on an 8-ch Float32 non-interleaved CAF
+  - Write the assembled buffers via `AVAudioFile.write(from:)` in both SC and input paths
+  - Remove ExtAudioFile state; keep a single `AVAudioFile` handle
+  - Run all tests and ensure they pass
+
+- [x] 34. Fix AudioBufferList allocation to prevent heap corruption
+
+  - Allocate `AudioBufferList` using raw pointer with correct byte count for channelCount buffers
+  - Initialize memory and bind to `AudioBufferList` before populating
+  - Free channel buffers and raw ABL memory safely
+  - Verify no crash during initial silence write and input writes
+  - Run all tests and verify CLI run produces growing CAF without crashing
+ 
+- [x] 35. Add integration test to verify CAF file grows with --capture-inputs
+
+  - Create new test that runs recorder with -c to a temp dir for ~3–5s
+  - Skip on CI or when Screen Recording or Microphone permission is not granted or no main display
+  - After SIGINT, assert a .caf file exists and size > 12 KB (greater than header)
+  - Use AUDIOCAP_SKIP_PROCESS_CHECK=1 to avoid dependency on running processes
+  - Ensure tests pass
+
+- [x] 36. Fix InputDeviceManagerDelegate retention issue
+
+  - Store CombinedInputDelegate instance to prevent deallocation
+  - Verify microphone audio is captured to channel 3
+  - Verify process audio (Chrome) is captured to channels 1-2
+  - Confirm 8-channel CAF file with proper audio levels
+ 
+- [ ] 29. Fallback to process-only recording when microphone permission is denied with -c
+
+  - Update CLI to request microphone permission; if denied, log guidance but proceed with `captureInputs=false`
+  - Ensure capturer and input manager are constructed using effective flag
+  - Maintain behavior when permission is granted
+  - Run all tests and ensure they pass

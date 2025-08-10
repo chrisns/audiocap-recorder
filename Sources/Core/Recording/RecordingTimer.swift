@@ -10,6 +10,7 @@ public final class RecordingTimer {
 
     private var startDate: Date?
     private var timer: DispatchSourceTimer?
+    private var isRunning: Bool = false
 
     public init(queue: DispatchQueue = .main, tickInterval: TimeInterval = 1.0, maxDurationSeconds: Int) {
         self.queue = queue
@@ -18,11 +19,13 @@ public final class RecordingTimer {
     }
 
     public func start(onTick: @escaping TickHandler, onCompleted: @escaping CompletionHandler) {
+        stop()
         startDate = Date()
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: tickInterval)
-        timer.setEventHandler { [weak self] in
-            guard let self = self, let start = self.startDate else { return }
+        isRunning = true
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + tickInterval, repeating: tickInterval)
+        t.setEventHandler { [weak self] in
+            guard let self = self, self.isRunning, let start = self.startDate else { return }
             let elapsed = Int(Date().timeIntervalSince(start))
             onTick(elapsed)
             if elapsed >= self.maxDurationSeconds {
@@ -30,11 +33,12 @@ public final class RecordingTimer {
                 onCompleted()
             }
         }
-        self.timer = timer
-        timer.resume()
+        timer = t
+        t.resume()
     }
 
     public func stop() {
+        isRunning = false
         timer?.cancel()
         timer = nil
         startDate = nil

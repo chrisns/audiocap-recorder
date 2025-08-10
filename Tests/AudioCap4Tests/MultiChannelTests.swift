@@ -7,7 +7,7 @@ final class MultiChannelTests: XCTestCase {
         let fc = FileController()
         let tempDir = NSTemporaryDirectory().appending("audiocap-tests-") + UUID().uuidString
         try fc.createOutputDirectory(tempDir)
-        let base = "2025-01-01-00-00-00.wav"
+        let base = "2025-01-01-00-00-00.caf"
         let mapping: [String: Any] = [
             "sessionId": UUID().uuidString,
             "channels": [

@@ -57,6 +57,8 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
             self.connectedDevicesByUID[audioDev.uid] = audioDev
             let updated = self.assignChannels(for: Array(self.connectedDevicesByUID.values))
             if let assigned = updated.first(where: { $0.uid == audioDev.uid })?.assignedChannel {
+                audioDev.assignedChannel = assigned
+                self.connectedDevicesByUID[audioDev.uid] = audioDev
                 self.delegate?.deviceConnected(audioDev, assignedToChannel: assigned)
             }
         }
@@ -272,7 +274,8 @@ private extension InputDeviceManager {
             guard let self else { return }
             // Convert to 48kHz mono if needed
             let converted = self.convert(buffer: buffer, to: targetFormat)
-            let dev = self.connectedDevicesByUID[device.uid] ?? device
+            var dev = self.connectedDevicesByUID[device.uid] ?? device
+            dev.assignedChannel = self.channelByUID[device.uid] ?? dev.assignedChannel
             self.delegate?.audioDataReceived(from: dev, buffer: converted)
         }
 

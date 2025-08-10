@@ -1,6 +1,6 @@
 # AudioCap4
 
-Process-filtered system audio recorder for macOS. This command-line tool records system audio and saves it to timestamped `.wav` files, targeting only processes whose names or bundle identifiers match a regular expression. Built with ScreenCaptureKit, AVFoundation, and swift-argument-parser.
+Process-filtered system audio recorder for macOS. This command-line tool records system audio and saves it to timestamped `.caf` files, targeting only processes whose names or bundle identifiers match a regular expression. Built with ScreenCaptureKit, AVFoundation, and swift-argument-parser.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ swift run audiocap-recorder "Spotify|Music" --capture-inputs
 
 - Press Ctrl+C to stop recording gracefully.
 - Default output directory: `~/Documents/audiocap/`
-- Output filename format: `YYYY-MM-DD-HH-mm-ss.wav`
+- Output filename format: `YYYY-MM-DD-HH-mm-ss.caf`
 - Max recording duration enforced by the app is 12 hours per session.
 
 ## Usage
@@ -65,7 +65,7 @@ swift run audiocap-recorder "com\.google\.Chrome|Chrome"
 # Save to a custom location with verbose logging
 swift run audiocap-recorder "Spotify|Music" -o ~/Desktop/captures -v
 
-# Also capture input devices (channels will be added in future versions)
+# Also capture input devices (channels combined into multi-channel file)
 swift run audiocap-recorder "Spotify|Music" -c
 
 # Run the installed/release binary directly
@@ -101,13 +101,13 @@ Notes:
 
 ## Multi-channel Recording (inputs + process audio)
 
-When `--capture-inputs` is provided, AudioCap4 captures available audio input devices along with process audio and prepares 8-channel output (in-progress pipeline):
+When `--capture-inputs` is provided, AudioCap4 captures available audio input devices along with process audio and writes an 8-channel `.caf` file at 48 kHz:
 
 - Channels 1–2: Process audio (stereo)
 - Channels 3–8: Input devices (up to 6 devices, one per channel)
 - Unused channels are silent (zero-filled)
 
-A channel mapping JSON is written alongside the WAV file to document device-to-channel assignments and any device hot-swaps during the session.
+A channel mapping JSON is written alongside the CAF file to document device-to-channel assignments and any device hot-swaps during the session.
 
 ### Channel mapping JSON
 
@@ -182,4 +182,4 @@ cp ./.build/release/audiocap-recorder ~/bin/
 - Process matching uses a regular expression against discovered process names and paths. Start simple (e.g., "Chrome") and refine as needed (e.g., "com\\.google\\.Chrome").
 - On first use, confirm Screen Recording permission or re-run after granting.
 - With `--capture-inputs`, confirm Microphone permission and available input devices.
-- Output audio is written as PCM `.wav` using the app’s current capture pipeline.
+- Output audio is written as PCM `.caf` using the app’s capture pipeline.
