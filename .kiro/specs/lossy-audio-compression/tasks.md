@@ -29,7 +29,7 @@
   - Write unit tests for compression controller coordination and format selection
   - _Requirements: 1.1, 2.1, 3.1, 7.1, 7.2, 8.1, 10.1, 10.2_
 
-- [ ] 4. Build AAC encoder with AVFoundation integration
+- [x] 4. Build AAC encoder with AVFoundation integration
 
   - Create AACEncoder class implementing AudioEncoderProtocol
   - Implement AAC format configuration with kAudioFormatMPEG4AAC and proper settings

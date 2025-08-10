@@ -30,6 +30,12 @@ public struct ErrorPresenter {
             return "ALAC compression is not supported on this system. Re-run without --alac to use uncompressed CAF."
         case .alacEncodingFailed(let message):
             return "ALAC encoding failed: \(message). The recorder will fall back to uncompressed CAF."
+        case .compressionNotSupported(let reason):
+            return "Compression not supported: \(reason). Try a different format or disable compression."
+        case .compressionConfigurationInvalid(let reason):
+            return "Invalid compression configuration: \(reason). Review your --aac/--mp3/--bitrate/--quality options."
+        case .compressionEncodingFailed(let reason):
+            return "Compression encoding failed: \(reason). The recorder may fall back to uncompressed output."
         }
     }
 }

@@ -10,6 +10,11 @@ public enum AudioRecorderError: LocalizedError, Equatable, Sendable {
     case alacNotSupported
     case alacEncodingFailed(String)
 
+    // Compression-specific
+    case compressionNotSupported(String)
+    case compressionConfigurationInvalid(String)
+    case compressionEncodingFailed(String)
+
     public enum PermissionType: Equatable, Sendable {
         case screenRecording
         case fileSystem
@@ -35,6 +40,12 @@ public enum AudioRecorderError: LocalizedError, Equatable, Sendable {
             return "ALAC compression is not supported on this system configuration."
         case .alacEncodingFailed(let message):
             return "ALAC encoding failed: \(message)"
+        case .compressionNotSupported(let reason):
+            return "Compression not supported: \(reason)"
+        case .compressionConfigurationInvalid(let reason):
+            return "Invalid compression configuration: \(reason)"
+        case .compressionEncodingFailed(let reason):
+            return "Compression encoding failed: \(reason)"
         }
     }
 }
