@@ -341,4 +341,105 @@
   - Update tests to reflect new channel assignments
   - Update requirements and design docs to document mono configuration
   - Verify mono process audio on channel 1, microphone on channel 2
+
+- [ ] 38. Add ALAC compression CLI option and argument parsing
+
+- [x] 38.1 Add `--alac`/`-a` flag to `AudioRecorderCLI`
+  - Add `@Flag(name: [.customShort("a"), .customLong("alac")], help: "Enable ALAC (Apple Lossless) compression for output files") var enableALAC: Bool = false`
+  - Ensure default is `false` and help text describes benefits and output format (`.m4a`)
+  - _Requirements: 16.1_
+
+- [x] 38.2 Plumb configuration through the app
+  - Add `enableALAC` to runtime configuration/state and pass to recording workflow entry points
+  - No behavior change when `false`; this only enables later ALAC steps
+  - _Requirements: 16.1_
+
+- [x] 38.3 Validation scaffolding for conflicting compression flags
+  - Add guard structure to prevent incompatible compression flags (future-proof); produce clear error when multiple compression modes are selected
+  - Unit test this validation with stubbed alternative flag to lock behavior
+  - _Requirements: 16.1_
+
+- [x] 38.4 Unit tests for CLI parsing
+  - In `CLITests.swift`, add tests verifying: default is `false`, `--alac` sets `true`, short `-a` works, and help text includes ALAC description
+  - _Requirements: 16.1_
+
+- [ ] 39. Implement ALAC audio format configuration and validation
+
+  - Create ALACConfiguration struct to manage ALAC encoding settings (sample rate, bit depth, channel count)
+  - Implement ALAC-compatible AVAudioFormat creation with proper codec settings (kAudioFormatAppleLossless)
+  - Add validation for ALAC constraints (maximum 8 channels, supported sample rates, bit depths)
+  - Create ALAC settings dictionary with optimal quality parameters (AVEncoderAudioQualityKey: max)
+  - Implement format conversion utilities for PCM-to-ALAC encoding preparation
+  - Write unit tests for ALAC format configuration and constraint validation
+
+- [ ] 40. Enhance FileController for ALAC file creation and management
+
+  - Add ALAC file creation methods using AVAudioFile with ALAC settings
+  - Implement ALAC-specific filename generation with .m4a extension for better compatibility
+  - Create ALAC file writing methods that handle multi-channel audio (up to 8 channels)
+  - Add ALAC file size monitoring and compression ratio reporting
+  - Implement proper error handling for ALAC encoding failures and fallback to uncompressed
+  - Write unit tests for ALAC file creation, writing, and error handling scenarios
+
+- [ ] 41. Update AudioProcessor for ALAC-compatible audio processing
+
+  - Modify audio buffer processing to ensure ALAC-compatible PCM format (interleaved Int16/Int24)
+  - Implement audio format conversion from Float32 (ScreenCaptureKit) to ALAC-compatible formats
+  - Add buffer management optimizations for ALAC encoding (larger buffers for better compression)
+  - Create audio quality preservation checks to ensure lossless encoding
+  - Implement real-time compression ratio monitoring and performance metrics
+  - Write unit tests for ALAC audio processing and format conversion accuracy
+
+- [ ] 42. Integrate ALAC encoding with AudioCapturer workflow
+
+  - Modify AudioCapturer to support ALAC output alongside existing CAF output
+  - Implement conditional ALAC file creation based on CLI flag in recording workflow
+  - Add ALAC encoding to both single-channel (process-only) and multi-channel (with inputs) recording modes
+  - Create ALAC-specific audio buffer handling and writing in real-time capture loop
+  - Implement ALAC encoding performance monitoring and CPU usage tracking
+  - Add graceful fallback to uncompressed CAF if ALAC encoding fails during recording
+  - Write integration tests for ALAC-enabled recording workflows
+
+- [ ] 43. Add ALAC compression performance optimization and monitoring
+
+  - Implement background thread processing for ALAC encoding to minimize audio dropouts
+  - Add ALAC compression ratio calculation and real-time reporting to user
+  - Create buffer size optimization for ALAC encoding efficiency vs. latency trade-offs
+  - Implement memory usage monitoring for ALAC encoding buffers and cleanup
+  - Add ALAC encoding speed benchmarking and performance warnings for slow systems
+  - Create compression statistics logging (original size, compressed size, ratio, encoding time)
+  - Write performance tests for ALAC encoding under various system loads
+
+- [ ] 44. Update error handling and user guidance for ALAC compression
+
+  - Add ALAC-specific error types and localized error messages
+  - Implement user guidance for ALAC encoding failures and system requirements
+  - Create fallback mechanisms when ALAC encoding is not available or fails
+  - Add ALAC compatibility warnings for older macOS versions or unsupported configurations
+  - Implement ALAC file validation and corruption detection
+  - Create user notifications for compression ratio achievements and file size savings
+  - Write unit tests for ALAC error handling and user guidance scenarios
+
+- [ ] 45. Add comprehensive ALAC testing and validation
+
+  - Create integration tests for ALAC-compressed file creation and playback verification
+  - Implement ALAC compression ratio validation tests (ensure 40-60% size reduction)
+  - Add multi-channel ALAC encoding tests with channel mapping verification
+  - Create ALAC file format validation tests using AVAudioFile reading
+  - Implement ALAC vs. uncompressed audio quality comparison tests (bit-perfect verification)
+  - Add ALAC performance benchmarking tests for encoding speed and CPU usage
+  - Create end-to-end ALAC workflow tests combining process audio and input device capture
+  - Write ALAC compatibility tests for various macOS versions and hardware configurations
+
+- [ ] 46. Update documentation and finalize ALAC compression feature
+
+  - Update README.md with comprehensive ALAC compression documentation and benefits
+  - Document ALAC file format specifications and compatibility requirements
+  - Add usage examples showing --alac flag with various recording scenarios
+  - Document ALAC compression ratios, performance characteristics, and system requirements
+  - Include ALAC troubleshooting section for encoding failures and performance issues
+  - Update command-line help with ALAC-specific options and recommendations
+  - Create ALAC vs. uncompressed comparison guide for users
+  - Verify all ALAC-related code documentation and comments are comprehensive
+  - Run final integration tests to ensure ALAC feature works with all existing functionality
  

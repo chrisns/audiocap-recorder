@@ -7,9 +7,10 @@ A command-line macOS application that captures system audio from specific proces
 ### Key Features
 - Process-specific audio recording using regex pattern matching
 - ScreenCaptureKit integration for system audio capture
-- Automatic timestamped WAV file output
+- Automatic timestamped CAF file output (optionally ALAC-compressed .m4a via --alac)
 - Real-time recording feedback and duration limits
 - Graceful shutdown and permission handling
+- Optional ALAC (Apple Lossless) compression for smaller files
 
 ### Target Platform
 - macOS Sequoia 15.6+ (requires ScreenCaptureKit framework)

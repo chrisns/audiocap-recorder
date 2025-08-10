@@ -50,6 +50,7 @@ graph TB
 - Validate input parameters and permissions
 - Coordinate application lifecycle
 - Display real-time recording feedback
+- Parse `--alac` flag to enable ALAC compression mode
 
 **Key Properties:**
 
@@ -66,6 +67,9 @@ struct AudioRecorderCLI: ParsableCommand {
 
     @Flag(name: .shortAndLong, help: "Capture all audio input devices in addition to process audio")
     var captureInputs: Bool = false
+
+    @Flag(name: .shortAndLong, help: "Enable ALAC (Apple Lossless) compression for output files")
+    var enableALAC: Bool = false
 }
 ```
 
@@ -290,10 +294,120 @@ struct DeviceEvent {
 
 **File Naming Convention:**
 
-- Audio files: `yyyy-MM-dd-HH-mm-ss.caf` (8-channel CAF)
+- Audio files: `yyyy-MM-dd-HH-mm-ss.caf` (8-channel CAF) or `yyyy-MM-dd-HH-mm-ss.m4a` (ALAC compressed)
 - Channel mapping: `yyyy-MM-dd-HH-mm-ss-channels.json`
 - Default location: `~/Documents/audiocap/`
 - Automatic directory creation with proper permissions
+
+### 7. ALAC Compression Engine (`ALACCompressionEngine`)
+
+**Responsibilities:**
+
+- Manage ALAC (Apple Lossless Audio Codec) encoding configuration and settings
+- Convert PCM audio buffers to ALAC-compatible formats for compression
+- Handle real-time ALAC encoding with performance monitoring
+- Provide compression statistics and file size reduction metrics
+- Implement fallback mechanisms for ALAC encoding failures
+
+**Key Methods:**
+
+```swift
+class ALACCompressionEngine {
+    func configureALACFormat(sampleRate: Double, channelCount: AVAudioChannelCount, bitDepth: Int) -> AVAudioFormat?
+    func createALACSettings(quality: ALACQuality) -> [String: Any]
+    func createALACFile(at url: URL, format: AVAudioFormat) throws -> AVAudioFile
+    func encodeBuffer(_ buffer: AVAudioPCMBuffer, to file: AVAudioFile) throws
+    func getCompressionStatistics() -> ALACCompressionStats
+    func validateALACCompatibility() -> Bool
+}
+
+struct ALACConfiguration {
+    let sampleRate: Double
+    let channelCount: AVAudioChannelCount
+    let bitDepth: Int
+    let quality: ALACQuality
+    let enableRealTimeEncoding: Bool
+    let bufferSize: AVAudioFrameCount
+
+    static let defaultConfiguration = ALACConfiguration(
+        sampleRate: 48000,
+        channelCount: 8,
+        bitDepth: 16,
+        quality: .maximum,
+        enableRealTimeEncoding: true,
+        bufferSize: 4096
+    )
+}
+
+enum ALACQuality {
+    case minimum
+    case low
+    case medium
+    case high
+    case maximum
+
+    var avAudioQuality: AVAudioQuality {
+        switch self {
+        case .minimum: return .min
+        case .low: return .low
+        case .medium: return .medium
+        case .high: return .high
+        case .maximum: return .max
+        }
+    }
+}
+
+struct ALACCompressionStats {
+    let originalSize: Int64
+    let compressedSize: Int64
+    let compressionRatio: Double
+    let encodingTime: TimeInterval
+    let averageEncodingSpeed: Double // MB/s
+    let cpuUsagePercent: Double
+
+    var fileSizeReduction: Double {
+        return (1.0 - Double(compressedSize) / Double(originalSize)) * 100.0
+    }
+}
+```
+
+**ALAC Encoding Pipeline:**
+
+1. Validate ALAC compatibility (macOS version, channel count ≤ 8, supported sample rates)
+2. Configure ALAC audio format with optimal settings (kAudioFormatAppleLossless)
+3. Create ALAC-compatible AVAudioFile with .m4a container
+4. Convert Float32 PCM buffers to ALAC-compatible interleaved Int16/Int24 format
+5. Perform real-time ALAC encoding with performance monitoring
+6. Track compression statistics and file size reduction
+7. Handle encoding failures with graceful fallback to uncompressed CAF
+
+**ALAC Format Configuration:**
+
+```swift
+let alacSettings: [String: Any] = [
+    AVFormatIDKey: kAudioFormatAppleLossless,
+    AVNumberOfChannelsKey: channelCount,
+    AVSampleRateKey: sampleRate,
+    AVEncoderBitDepthHintKey: bitDepth,
+    AVEncoderAudioQualityKey: AVAudioQuality.max.rawValue,
+    AVSampleRateConverterAudioQualityKey: AVAudioQuality.max.rawValue
+]
+```
+
+**Performance Optimizations:**
+
+- **Background Encoding**: Use dedicated encoding queue to prevent audio dropouts
+- **Buffer Management**: Optimize buffer sizes for ALAC encoding efficiency (larger buffers = better compression)
+- **Memory Pool**: Pre-allocate and reuse encoding buffers to minimize allocation overhead
+- **CPU Monitoring**: Track encoding CPU usage and adjust quality/buffer size dynamically
+- **Compression Caching**: Cache ALAC encoder state for consistent performance
+
+**Error Handling and Fallback:**
+
+- **Encoding Failures**: Automatically fallback to uncompressed CAF recording
+- **Performance Issues**: Reduce ALAC quality or disable compression if CPU usage exceeds thresholds
+- **Compatibility Checks**: Validate ALAC support before starting recording session
+- **File System Errors**: Handle disk space issues and provide alternative storage locations
 
 ## Data Models
 
@@ -405,7 +519,8 @@ class PermissionManager {
 - **Audio Processing**: Test audio buffer manipulation and 8-channel WAV conversion with sample data
 - **Input Device Management**: Test device enumeration, device filtering (aggregate/virtual exclusion), hot-swapping, and channel assignment
 - **File Operations**: Test directory creation, file naming, channel mapping logs, and error handling
-- **CLI Parsing**: Test argument validation, help text generation, and new --capture-inputs flag
+- **CLI Parsing**: Test argument validation, help text generation, --capture-inputs flag, and --alac flag
+- **ALAC Compression**: Test ALAC format configuration, encoding performance, compression ratios, and error handling
 
 ### Integration Testing
 
@@ -413,7 +528,8 @@ class PermissionManager {
 - **Input Device Integration**: Test multi-device capture and hot-swapping scenarios
 - **Process Monitoring**: Test process lifecycle events and correlation
 - **8-Channel Audio Pipeline**: Test complete audio processing from capture to 8-channel WAV output
-- **End-to-End Workflows**: Test complete recording sessions with simulated processes and input devices
+- **ALAC Integration**: Test ALAC-compressed recording workflows with both single-channel and multi-channel audio
+- **End-to-End Workflows**: Test complete recording sessions with simulated processes and input devices, including ALAC compression scenarios
 
 ### Testing Framework
 
@@ -431,6 +547,12 @@ class AudioRecorderTests: XCTestCase {
     func testDeviceHotSwapping()
     func testFileOutput()
     func testErrorHandling()
+    func testALACConfiguration()
+    func testALACEncoding()
+    func testALACCompressionRatio()
+    func testALACPerformance()
+    func testALACFallback()
+    func testALACMultiChannel()
 }
 
 // Mock implementations for testing
@@ -438,6 +560,7 @@ class MockProcessManager: ProcessManagerProtocol
 class MockAudioCapturer: AudioCapturerProtocol
 class MockInputDeviceManager: InputDeviceManagerProtocol
 class MockFileController: FileControllerProtocol
+class MockALACCompressionEngine: ALACCompressionEngineProtocol
 ```
 
 ### Performance Testing
@@ -446,6 +569,8 @@ class MockFileController: FileControllerProtocol
 - **CPU Impact**: Measure CPU usage of audio processing and correlation
 - **File I/O Performance**: Test write performance with large audio files
 - **Process Monitoring Overhead**: Measure impact of continuous process monitoring
+- **ALAC Encoding Performance**: Benchmark ALAC encoding speed, CPU usage, and memory consumption
+- **Compression Efficiency**: Validate ALAC compression ratios and file size reduction across different audio content types
 
 ## Implementation Notes
 

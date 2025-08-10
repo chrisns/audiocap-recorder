@@ -9,6 +9,7 @@
 - **ScreenCaptureKit**: System audio capture (requires macOS 12.3+)
 - **Swift ArgumentParser**: Command-line interface parsing
 - **AVFoundation**: Audio processing and format conversion
+- **Apple Lossless (ALAC)**: Lossless compression via AVFoundation (`kAudioFormatAppleLossless`) and `.m4a` container
 - **Foundation**: Core system APIs and utilities
 - **XCTest**: Testing framework
 

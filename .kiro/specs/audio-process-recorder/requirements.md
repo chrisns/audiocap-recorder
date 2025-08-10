@@ -172,3 +172,47 @@ This feature involves creating a command-line macOS application that can record 
 2. WHEN enumerating audio input devices THEN the system SHALL exclude virtual audio interfaces (such as software-created devices) from the available device list
 3. WHEN filtering devices THEN the system SHALL only include physical audio input devices such as built-in microphones, USB audio interfaces, and hardware-based audio devices
 4. WHEN aggregate or virtual devices are detected THEN the system SHALL log their exclusion for debugging purposes but not display them to the user
+
+### Requirement 16
+
+**User Story:** As a user, I want the option to enable ALAC (Apple Lossless Audio Codec) compression for my recordings, so that I can significantly reduce file sizes while maintaining perfect audio quality for long recording sessions.
+
+#### Acceptance Criteria
+
+1. WHEN the --alac CLI flag is provided THEN the system SHALL encode all audio output using ALAC compression instead of uncompressed CAF
+2. WHEN ALAC compression is enabled THEN the system SHALL create .m4a files with ALAC encoding that are 40-60% smaller than uncompressed equivalents
+3. WHEN ALAC compression is used THEN the system SHALL maintain bit-perfect lossless audio quality identical to the original uncompressed audio
+4. WHEN ALAC encoding fails THEN the system SHALL gracefully fallback to uncompressed CAF recording and notify the user of the fallback
+
+### Requirement 17
+
+**User Story:** As a user, I want ALAC compression to work seamlessly with multi-channel recording, so that I can benefit from reduced file sizes even when capturing multiple input devices simultaneously.
+
+#### Acceptance Criteria
+
+1. WHEN ALAC compression is enabled with --capture-inputs THEN the system SHALL create multi-channel ALAC files supporting up to 8 channels
+2. WHEN multi-channel ALAC recording is active THEN the system SHALL maintain proper channel mapping and assignment for all input devices
+3. WHEN ALAC multi-channel encoding occurs THEN the system SHALL preserve audio quality and channel separation identical to uncompressed multi-channel recording
+4. WHEN multi-channel ALAC files are created THEN the system SHALL generate corresponding channel mapping logs alongside the compressed audio files
+
+### Requirement 18
+
+**User Story:** As a user, I want real-time feedback about ALAC compression performance and file size savings, so that I can monitor the effectiveness of compression during recording sessions.
+
+#### Acceptance Criteria
+
+1. WHEN ALAC recording is active THEN the system SHALL display real-time compression ratio and estimated file size savings
+2. WHEN ALAC encoding experiences performance issues THEN the system SHALL warn the user about potential audio dropouts or encoding delays
+3. WHEN ALAC recording completes THEN the system SHALL report final compression statistics including original size, compressed size, and compression ratio
+4. WHEN ALAC compression achieves significant savings THEN the system SHALL notify the user of the file size reduction percentage
+
+### Requirement 19
+
+**User Story:** As a user, I want robust error handling and fallback mechanisms for ALAC compression, so that my recording sessions are never interrupted by compression failures.
+
+#### Acceptance Criteria
+
+1. WHEN ALAC encoding fails during recording THEN the system SHALL automatically switch to uncompressed CAF recording without stopping the session
+2. WHEN ALAC compression is not supported on the system THEN the system SHALL display a clear error message and suggest using uncompressed recording
+3. WHEN ALAC encoding encounters CPU performance issues THEN the system SHALL provide options to reduce compression quality or disable compression
+4. WHEN ALAC file creation fails THEN the system SHALL attempt to save the audio in uncompressed format and notify the user of the format change

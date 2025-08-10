@@ -136,7 +136,7 @@ final class InputDeviceManagerTests: XCTestCase {
         XCTAssertEqual(chY3, chY1)
     }
     
-    func testInputAudioConvertedToMono() {
+    func testInputAudioConvertedToMono() throws {
         // Create a test delegate to capture audio buffers
         class TestDelegate: InputDeviceManagerDelegate {
             var receivedBuffers: [(device: AudioInputDevice, buffer: AVAudioPCMBuffer)] = []

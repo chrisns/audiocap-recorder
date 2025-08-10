@@ -33,19 +33,22 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     private var inputRingBuffers: [Int: RingBuffer] = [:]
     
     private var extAudioFile: ExtAudioFileRef?
+    private let alacEnabled: Bool
 
     public init(
         permissionManager: PermissionManaging = PermissionManager(),
         fileController: FileControllerProtocol = FileController(),
         audioProcessor: AudioProcessorProtocol = AudioProcessor(),
         outputDirectoryPath: String? = nil,
-        captureInputsEnabled: Bool = false
+        captureInputsEnabled: Bool = false,
+        alacEnabled: Bool = false
     ) {
         self.permissionManager = permissionManager
         self.fileController = fileController
         self.audioProcessor = audioProcessor
         self.outputDirectoryPath = outputDirectoryPath
         self.captureInputsEnabled = captureInputsEnabled
+        self.alacEnabled = alacEnabled
         super.init()
     }
 

@@ -46,8 +46,9 @@ AudioRecorder/
 ### Core Components (`Sources/AudioRecorder/Core/`)
 - **ProcessManager**: Handles process discovery using NSRunningApplication and regex matching
 - **AudioCapturer**: Manages ScreenCaptureKit audio capture and SCStreamDelegate implementation
-- **AudioProcessor**: Processes audio buffers, correlates with process activity, converts to WAV
+- **AudioProcessor**: Processes audio buffers, correlates with process activity, and combines to multi-channel
 - **FileController**: Manages output directories, timestamped filenames, and file writing
+- **ALACCompressionEngine**: Configures and performs ALAC encoding; writes .m4a via AVAudioFile
 
 ### CLI Layer (`Sources/AudioRecorder/CLI/`)
 - **AudioRecorderCLI**: Main command interface using Swift ArgumentParser

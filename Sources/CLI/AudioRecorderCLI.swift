@@ -20,6 +20,9 @@ public struct AudioRecorderCLI: ParsableCommand {
     @Flag(name: .shortAndLong, help: "Capture all audio input devices in addition to process audio")
     public var captureInputs: Bool = false
 
+    @Flag(name: [.customShort("a"), .customLong("alac")], help: "Enable ALAC (Apple Lossless) compression for output files (.m4a)")
+    public var enableALAC: Bool = false
+
     public init() {}
 
     public func validate() throws {
@@ -27,6 +30,14 @@ public struct AudioRecorderCLI: ParsableCommand {
             _ = try NSRegularExpression(pattern: processRegex)
         } catch {
             throw ValidationError("Invalid regex pattern: \(processRegex)")
+        }
+        try validateCompressionFlags()
+    }
+
+    private func validateCompressionFlags() throws {
+        let selectedCompressionModes = (enableALAC ? 1 : 0)
+        if selectedCompressionModes > 1 {
+            throw ValidationError("Multiple compression modes selected. Please choose only one compression mode.")
         }
     }
 
@@ -66,6 +77,7 @@ public struct AudioRecorderCLI: ParsableCommand {
         }
         logger.info("- Verbose: \(verbose)")
         logger.info("- Capture inputs: \(captureInputs)")
+        logger.info("- ALAC compression: \(enableALAC)")
 
         let processManager = ProcessManager()
         let processes: [RecorderProcessInfo]
@@ -87,8 +99,8 @@ public struct AudioRecorderCLI: ParsableCommand {
             }
         }
 
-        // Create capturer with knowledge of input capture
-        let capturer = AudioCapturer(permissionManager: permissionManager, fileController: FileController(), audioProcessor: AudioProcessor(), outputDirectoryPath: outputDirectory, captureInputsEnabled: captureInputs)
+        // Create capturer with knowledge of input capture and ALAC preference
+        let capturer = AudioCapturer(permissionManager: permissionManager, fileController: FileController(), audioProcessor: AudioProcessor(), outputDirectoryPath: outputDirectory, captureInputsEnabled: captureInputs, alacEnabled: enableALAC)
 
         // Optional input device manager lifecycle
         var inputManager: InputDeviceManager? = nil
