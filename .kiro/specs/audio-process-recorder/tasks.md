@@ -363,7 +363,7 @@
   - In `CLITests.swift`, add tests verifying: default is `false`, `--alac` sets `true`, short `-a` works, and help text includes ALAC description
   - _Requirements: 16.1_
 
-- [ ] 39. Implement ALAC audio format configuration and validation
+- [x] 39. Implement ALAC audio format configuration and validation
 
   - Create ALACConfiguration struct to manage ALAC encoding settings (sample rate, bit depth, channel count)
   - Implement ALAC-compatible AVAudioFormat creation with proper codec settings (kAudioFormatAppleLossless)
