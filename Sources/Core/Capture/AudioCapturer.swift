@@ -130,9 +130,9 @@ extension AudioCapturer {
             // Seed file with a small block of silence
             writeSilence(frames: 1024)
         } else {
-            // Stereo CAF using AVAudioFile
-            let stereo = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 2, interleaved: false)!
-            self.outputFile = try AVAudioFile(forWriting: self.outputURL!, settings: stereo.settings)
+            // Mono CAF using AVAudioFile
+            let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
+            self.outputFile = try AVAudioFile(forWriting: self.outputURL!, settings: mono.settings)
         }
 
         try await stream.startCapture()
@@ -158,18 +158,14 @@ extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
         do {
             if captureInputsEnabled {
                 guard let ext = self.extAudioFile else { return }
-                guard let pcmStereo = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
-                let frames = Int(pcmStereo.frameLength)
+                guard let pcmMono = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
+                let frames = Int(pcmMono.frameLength)
                 if frames <= 0 { return }
-                // Build non-interleaved 8ch buffer list with process on ch 1-2
+                // Build non-interleaved 8ch buffer list with process on ch 1 only
                 withTemporaryABL(channelCount: 8, frames: frames) { abl, channels in
-                    if let procCh = pcmStereo.floatChannelData {
+                    if let procCh = pcmMono.floatChannelData {
                         memcpy(channels[0], procCh[0], frames * MemoryLayout<Float>.size)
-                        if pcmStereo.format.channelCount >= 2 {
-                            memcpy(channels[1], procCh[1], frames * MemoryLayout<Float>.size)
-                        } else {
-                            memcpy(channels[1], procCh[0], frames * MemoryLayout<Float>.size)
-                        }
+                        // Channels 1-7 remain silent (for input devices)
                     }
                     let status = ExtAudioFileWrite(ext, UInt32(frames), abl)
                     if status != noErr {
@@ -178,8 +174,8 @@ extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
                 }
             } else {
                 guard let file = self.outputFile,
-                      let pcmStereo = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
-                try file.write(from: pcmStereo)
+                      let pcmMono = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
+                try file.write(from: pcmMono)
             }
         } catch {
             delegate?.didEncounterError(.fileSystemError(error.localizedDescription))

@@ -136,9 +136,9 @@ This feature involves creating a command-line macOS application that can record 
 #### Acceptance Criteria
 
 1. WHEN the --capture-inputs CLI option is provided THEN the system SHALL enumerate and capture from all available audio input devices
-2. WHEN audio input devices are captured THEN the system SHALL create an 8-channel CAF file with process audio on channels 1-2 and input devices on channels 3-8
-3. WHEN fewer than 6 input devices are available THEN the system SHALL leave unused channels silent in the 8-channel file
-4. WHEN more than 6 input devices are available THEN the system SHALL capture the first 6 devices and log a warning about additional devices being ignored
+2. WHEN audio input devices are captured THEN the system SHALL create an 8-channel CAF file with mono process audio on channel 1 and mono input devices on channels 2-8
+3. WHEN fewer than 7 input devices are available THEN the system SHALL leave unused channels silent in the 8-channel file
+4. WHEN more than 7 input devices are available THEN the system SHALL capture the first 7 devices and log a warning about additional devices being ignored
 
 ### Requirement 13
 

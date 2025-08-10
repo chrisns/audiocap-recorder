@@ -337,13 +337,13 @@ struct RecordingSession {
 ```swift
 struct AudioConfiguration {
     let sampleRate: Int = 48000
-    let processChannelCount: Int = 2
-    let inputDeviceChannelCount: Int = 6
+    let processChannelCount: Int = 1
+    let inputDeviceChannelCount: Int = 7
     let totalChannelCount: Int = 8
     let bitDepth: Int = 16
     let maxDurationHours: Int = 12
     let bufferSize: Int = 4096
-    let maxInputDevices: Int = 6
+    let maxInputDevices: Int = 7
 }
 ```
 

@@ -331,10 +331,14 @@
   - Verify microphone audio is captured to channel 3
   - Verify process audio (Chrome) is captured to channels 1-2
   - Confirm 8-channel CAF file with proper audio levels
- 
-- [ ] 29. Fallback to process-only recording when microphone permission is denied with -c
 
-  - Update CLI to request microphone permission; if denied, log guidance but proceed with `captureInputs=false`
-  - Ensure capturer and input manager are constructed using effective flag
-  - Maintain behavior when permission is granted
-  - Run all tests and ensure they pass
+- [x] 37. Flatten all audio to mono for maximum device support
+
+  - Update AudioProcessor to mix stereo process audio to mono
+  - Change process audio from channels 1-2 to channel 1 only
+  - Update InputDeviceManager to use channels 2-8 (7 channels for input devices)
+  - Update AudioCapturer to write mono process audio and handle new channel mapping
+  - Update tests to reflect new channel assignments
+  - Update requirements and design docs to document mono configuration
+  - Verify mono process audio on channel 1, microphone on channel 2
+ 

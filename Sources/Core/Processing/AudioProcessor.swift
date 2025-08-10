@@ -5,7 +5,7 @@ import Accelerate
 public final class AudioProcessor: AudioProcessorProtocol {
     private let targetFormat: AVAudioFormat
 
-    public init(sampleRate: Double = 48_000, channels: AVAudioChannelCount = 2) {
+    public init(sampleRate: Double = 48_000, channels: AVAudioChannelCount = 1) {
         self.targetFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channels)!
     }
 
@@ -19,7 +19,7 @@ public final class AudioProcessor: AudioProcessorProtocol {
         let frames = AVAudioFrameCount(CMSampleBufferGetNumSamples(sampleBuffer))
         guard frames > 0, sourceChannels > 0 else { return nil }
 
-        // Prepare destination buffer (48kHz stereo float)
+        // Prepare destination buffer (48kHz mono float)
         guard let dest = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frames) else { return nil }
         dest.frameLength = frames
         guard let destChannels = dest.floatChannelData else { return nil }
@@ -46,31 +46,39 @@ public final class AudioProcessor: AudioProcessorProtocol {
         guard status == noErr else { return nil }
 
         let audioList = UnsafeMutableAudioBufferListPointer(ablPtr)
+        let destMono = destChannels[0]
+        
         if audioList.count >= 2 {
-            // Planar float: one buffer per channel
-            for ch in 0..<min(2, audioList.count) {
+            // Planar float: mix channels to mono
+            memset(destMono, 0, frameCount * MemoryLayout<Float>.size)
+            for ch in 0..<min(sourceChannels, audioList.count) {
                 let buf = audioList[ch]
                 guard let mData = buf.mData else { continue }
-                memcpy(destChannels[ch], mData, min(Int(buf.mDataByteSize), frameCount * MemoryLayout<Float>.size))
-            }
-            if audioList.count == 1 {
-                memcpy(destChannels[1], destChannels[0], frameCount * MemoryLayout<Float>.size)
+                let src = mData.assumingMemoryBound(to: Float.self)
+                // Mix into mono with equal gain
+                let gain = 1.0 / Float(sourceChannels)
+                vDSP_vsma(src, 1, [gain], destMono, 1, destMono, 1, vDSP_Length(frameCount))
             }
         } else if audioList.count == 1 {
-            // Interleaved float
+            // Interleaved float: extract and mix to mono
             let buf = audioList[0]
             guard let mData = buf.mData else { return dest }
             let src = mData.assumingMemoryBound(to: Float.self)
-            var idx = 0
+            
             if sourceChannels >= 2 {
-                for i in 0..<frameCount {
-                    destChannels[0][i] = src[idx]
-                    destChannels[1][i] = src[idx + 1]
-                    idx += sourceChannels
+                // Mix stereo/multichannel to mono
+                memset(destMono, 0, frameCount * MemoryLayout<Float>.size)
+                for ch in 0..<sourceChannels {
+                    var channelSrc = [Float](repeating: 0, count: frameCount)
+                    for i in 0..<frameCount {
+                        channelSrc[i] = src[i * sourceChannels + ch]
+                    }
+                    let gain = 1.0 / Float(sourceChannels)
+                    vDSP_vsma(channelSrc, 1, [gain], destMono, 1, destMono, 1, vDSP_Length(frameCount))
                 }
             } else if sourceChannels == 1 {
-                memcpy(destChannels[0], src, frameCount * MemoryLayout<Float>.size)
-                memcpy(destChannels[1], src, frameCount * MemoryLayout<Float>.size)
+                // Already mono, just copy
+                memcpy(destMono, src, frameCount * MemoryLayout<Float>.size)
             }
         }
 

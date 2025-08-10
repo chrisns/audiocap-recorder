@@ -222,7 +222,7 @@ extension InputDeviceManager {
         let presentUIDs = Set(devices.map { $0.uid })
         channelByUID = channelByUID.filter { presentUIDs.contains($0.key) }
 
-        let availableChannels = Array(3...8)
+        let availableChannels = Array(2...8)
         var usedChannels = Set(channelByUID.values)
 
         let unassignedUIDs = devices
