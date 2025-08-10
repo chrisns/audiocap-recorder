@@ -188,6 +188,19 @@ public final class AudioProcessor: AudioProcessorProtocol {
         return out
     }
 
+    // MARK: - ALAC compatibility
+    public func alacCompatiblePCM(buffer: AVAudioPCMBuffer, config: ALACConfiguration) -> AVAudioPCMBuffer? {
+        // Convert float32 mono/non-interleaved into interleaved Int16 with given channel count
+        guard let pcmInt16 = try? ALACConfigurator.pcmClientFormat(for: config) else { return nil }
+        return convert(buffer: buffer, to: pcmInt16)
+    }
+
+    public func recommendedALACBufferFrames(sampleRate: Double = 48_000) -> AVAudioFrameCount {
+        // Favor larger buffers for better compression efficiency
+        // Use ~4096 frames (~85ms at 48k)
+        return 4096
+    }
+
     private func bufferDuration(_ buffer: AVAudioPCMBuffer) -> TimeInterval {
         return TimeInterval(buffer.frameLength) / buffer.format.sampleRate
     }

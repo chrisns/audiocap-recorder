@@ -67,4 +67,23 @@ final class AudioProcessorTests: XCTestCase {
         XCTAssertEqual(sum7, 0)
         XCTAssertEqual(sum8, 0)
     }
+
+    func testALACCompatiblePCMConversion() throws {
+        let processor = AudioProcessor()
+        let srcFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: 512)!
+        buffer.frameLength = 512
+        memset(buffer.floatChannelData![0], 0, Int(buffer.frameLength) * MemoryLayout<Float>.size)
+        let cfg = ALACConfiguration(sampleRate: 48_000, channelCount: 1, bitDepth: 16, quality: .max)
+        let converted = processor.alacCompatiblePCM(buffer: buffer, config: cfg)
+        XCTAssertNotNil(converted)
+        XCTAssertEqual(converted?.format.commonFormat, .pcmFormatInt16)
+        XCTAssertTrue(converted?.format.isInterleaved == true)
+    }
+
+    func testRecommendedALACBufferFrames() {
+        let processor = AudioProcessor()
+        let frames = processor.recommendedALACBufferFrames()
+        XCTAssertEqual(frames, 4096)
+    }
 }
