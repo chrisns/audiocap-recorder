@@ -38,6 +38,7 @@ public final class AudioCapturer: NSObject, AudioCapturerProtocol {
     // Lossy compression support (AAC/MP3)
     private var compressionController: CompressionController?
     private var compressionFormat: CompressionConfiguration.CompressionFormat = .uncompressed
+    private var lastProgressLog: TimeInterval = 0
 
     public init(
         permissionManager: PermissionManaging = PermissionManager(),
@@ -262,27 +263,41 @@ extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
                 }
             } else {
                 guard let file = self.outputFile,
-                      let pcmMono = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
+                      let pcmBuffer = audioProcessor.processAudioBuffer(sampleBuffer, from: []) else { return }
 
                 // Route to lossy compression when configured; on failure, fallback to writing CAF directly
                 if let controller = self.compressionController {
                     do {
-                        _ = try controller.processAudioBuffer(pcmMono)
+                        _ = try controller.processAudioBuffer(pcmBuffer)
+                        // Periodic progress logging every ~2 seconds when verbose
+                        if logger?.isVerbose == true {
+                            let now = Date().timeIntervalSince1970
+                            if now - lastProgressLog > 2.0 {
+                                if let p = controller.getCompressionProgress() {
+                                    let kb = Double(p.bytesProcessed) / 1024.0
+                                    let est = Double(p.estimatedTotalBytes) / 1024.0
+                                    let speed = p.encodingSpeedMBps
+                                    let pct = Int(p.compressionRatio * 100.0)
+                                    logger?.info(String(format: "Compression: processed=%.1f KB estCompressed=%.1f KB savings=%d%% speed=%.2f MB/s", kb, est, pct, speed))
+                                    lastProgressLog = now
+                                }
+                            }
+                        }
                     } catch let err as AudioRecorderError {
                         // Notify and disable compression; continue writing uncompressed
                         self.delegate?.didEncounterError(err)
                         self.logger?.warn("Compression error encountered. Falling back to uncompressed: \(err.localizedDescription)")
                         self.compressionController = nil
                         self.compressionFormat = .uncompressed
-                        try file.write(from: pcmMono)
+                        try file.write(from: pcmBuffer)
                     } catch {
                         self.logger?.warn("Compression error encountered. Falling back to uncompressed: \(error.localizedDescription)")
                         self.compressionController = nil
                         self.compressionFormat = .uncompressed
-                        try file.write(from: pcmMono)
+                        try file.write(from: pcmBuffer)
                     }
                 } else {
-                    try file.write(from: pcmMono)
+                    try file.write(from: pcmBuffer)
                 }
             }
         } catch {

@@ -71,6 +71,10 @@ final class CompressionController {
         }
     }
 
+    func getCompressionProgress() -> CompressionProgress? {
+        return engine?.getCompressionProgress()
+    }
+
     private func makeEngine(for config: CompressionConfiguration) throws -> CompressionEngineProtocol {
         switch config.format {
         case .aac:

@@ -6,8 +6,7 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
     private let encoder: AudioEncoderProtocol
 
     // Progress tracking
-    private var bytesProcessed: Int64 = 0
-    private var estimatedTotalBytes: Int64 = 0
+    private var bytesProcessed: Int64 = 0            // original PCM bytes processed (approx)
     private var startTime: Date?
 
     init(configuration: CompressionConfiguration) throws {
@@ -26,17 +25,15 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
 
     func createOutputFile(at url: URL, format: AVAudioFormat) throws -> AVAudioFile {
         startTime = Date()
-        // Rough estimate using configured bitrate and no duration known yet
-        estimatedTotalBytes = 0
         return try encoder.createAudioFile(at: url, format: format)
     }
 
     func processAudioBuffer(_ buffer: AVAudioPCMBuffer) throws -> Data? {
-        // Approximate incoming PCM size for progress
+        // Approximate incoming PCM size (assume 16-bit equivalent for savings estimation)
         let channels = Int(buffer.format.channelCount)
         let frames = Int(buffer.frameLength)
-        let bytes = Int64(channels * frames * 2) // assume int16 equivalent for estimation
-        bytesProcessed &+= bytes
+        let originalBytes = Int64(channels * frames * 2)
+        bytesProcessed &+= originalBytes
         _ = try encoder.encode(buffer: buffer)
         return nil
     }
@@ -48,11 +45,19 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
     func getCompressionProgress() -> CompressionProgress {
         let elapsed = startTime.map { Date().timeIntervalSince($0) } ?? 0
         let speedMBps = elapsed > 0 ? (Double(bytesProcessed) / 1_000_000.0) / elapsed : 0
-        let ratio = encoder.getCompressionRatio()
+
+        // Estimate compressed bytes so far from bitrate and elapsed time
+        let bitsPerSecond = Double(config.bitrate) * 1000.0
+        let compressedBytesSoFar = Int64((bitsPerSecond / 8.0) * max(0, elapsed))
+
+        // Compute reduction ratio: 1 - compressed/original
+        let reduction = bytesProcessed > 0 ? max(0.0, 1.0 - (Double(compressedBytesSoFar) / Double(bytesProcessed))) : 0.0
+
+        // Estimated total unknown without a target duration; provide current compressed size as estimate
         return CompressionProgress(
             bytesProcessed: bytesProcessed,
-            estimatedTotalBytes: estimatedTotalBytes,
-            compressionRatio: ratio,
+            estimatedTotalBytes: compressedBytesSoFar,
+            compressionRatio: reduction,
             encodingSpeedMBps: speedMBps,
             timeRemaining: nil
         )

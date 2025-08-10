@@ -18,6 +18,8 @@ public final class Logger {
         self.sink = sink
     }
 
+    public var isVerbose: Bool { isVerboseEnabled }
+
     public func info(_ message: String) {
         sink.write(message)
     }
