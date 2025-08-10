@@ -279,7 +279,13 @@ extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
                                     let speed = p.encodingSpeedMBps
                                     let pct = Int(p.compressionRatio * 100.0)
                                     let elapsed = Int(p.elapsedSeconds)
-                                    logger?.info(String(format: "Compression: t=%ds processed=%.1f KB estOut=%.1f KB savings=%d%% speed=%.2f MB/s", elapsed, kb, est, pct, speed))
+                                    let cpu = Int(p.cpuUsagePercent)
+                                    var etaText = ""
+                                    if let maxStr = ProcessInfo.processInfo.environment["AUDIOCAP_MAX_DURATION_SEC"], let max = Int(maxStr), max > elapsed {
+                                        let remaining = max - elapsed
+                                        etaText = String(format: " eta=%ds", remaining)
+                                    }
+                                    logger?.info(String(format: "Compression: t=%ds processed=%.1f KB estOut=%.1f KB savings=%d%% speed=%.2f MB/s cpu=%d%%%@", elapsed, kb, est, pct, speed, cpu, etaText))
                                     lastProgressLog = now
                                 }
                             }

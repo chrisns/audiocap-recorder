@@ -8,6 +8,7 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
     // Progress tracking
     private var bytesProcessed: Int64 = 0            // original PCM bytes processed (approx)
     private var startTime: Date?
+    private let cpu = CPUMonitor()
 
     init(configuration: CompressionConfiguration) throws {
         self.config = configuration
@@ -53,14 +54,15 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
         // Compute reduction ratio: 1 - compressed/original
         let reduction = bytesProcessed > 0 ? max(0.0, 1.0 - (Double(compressedBytesSoFar) / Double(bytesProcessed))) : 0.0
 
-        // We don't know a target duration from here; leave time remaining nil
+        let cpuPercent = cpu.sampleUsedPercent()
+
         return CompressionProgress(
             bytesProcessed: bytesProcessed,
             estimatedTotalBytes: compressedBytesSoFar,
             compressionRatio: reduction,
             encodingSpeedMBps: speedMBps,
             timeRemaining: nil,
-            cpuUsagePercent: 0,
+            cpuUsagePercent: cpuPercent,
             elapsedSeconds: elapsed
         )
     }
