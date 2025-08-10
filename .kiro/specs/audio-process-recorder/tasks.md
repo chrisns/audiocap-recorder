@@ -295,7 +295,7 @@
   - Log the chosen output directory and intended filename at start
   - Run all tests and ensure they pass
 
-- [ ] 32. Write on input audio callbacks to ensure multichannel file grows even if SC audio is silent
+- [x] 32. Write on input audio callbacks to ensure multichannel file grows even if SC audio is silent
 
   - In `AudioCapturer.receiveInputAudio`, when -c is enabled and ExtAudioFile is open, compose an 8ch buffer with process channels zeroed and the device's channel filled, then write it
   - Keep SC stream writes as-is for process audio

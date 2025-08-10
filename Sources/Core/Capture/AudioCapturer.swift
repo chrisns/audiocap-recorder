@@ -274,6 +274,13 @@ public extension AudioCapturer {
            let ringBuffer = inputRingBuffers[channel] {
             ringBuffer.write(inputData, frameCount: Int(buffer.frameLength))
         }
+        
+        // Ensure multichannel file grows even if SC audio is silent by triggering a write
+        if extAudioFile != nil || (alacEnabled && outputFile != nil && extAudioFile == nil) {
+            writeQueue.async { [weak self] in
+                self?.writeAudioFrame()
+            }
+        }
     }
 }
 
