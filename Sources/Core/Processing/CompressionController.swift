@@ -149,7 +149,7 @@ private final class PassthroughCompressionEngine: CompressionEngineProtocol {
             peakBitrate: nil
         )
     }
-    func getCompressionProgress() -> CompressionProgress { .init(bytesProcessed: 0, estimatedTotalBytes: 0, compressionRatio: 1.0, encodingSpeedMBps: 0, timeRemaining: nil) }
+    func getCompressionProgress() -> CompressionProgress { .init(bytesProcessed: 0, estimatedTotalBytes: 0, compressionRatio: 1.0, encodingSpeedMBps: 0, timeRemaining: nil, cpuUsagePercent: 0) }
 }
 
 private final class AACCompressionEngineStub: CompressionEngineProtocol {

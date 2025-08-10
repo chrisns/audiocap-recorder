@@ -59,7 +59,8 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
             estimatedTotalBytes: compressedBytesSoFar,
             compressionRatio: reduction,
             encodingSpeedMBps: speedMBps,
-            timeRemaining: nil
+            timeRemaining: nil,
+            cpuUsagePercent: 0
         )
     }
 

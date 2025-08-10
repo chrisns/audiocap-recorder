@@ -28,4 +28,5 @@ public struct CompressionProgress {
     let compressionRatio: Double
     let encodingSpeedMBps: Double
     let timeRemaining: TimeInterval?
+    let cpuUsagePercent: Double
 }
