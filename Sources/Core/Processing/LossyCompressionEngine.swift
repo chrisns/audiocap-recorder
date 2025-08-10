@@ -53,14 +53,15 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
         // Compute reduction ratio: 1 - compressed/original
         let reduction = bytesProcessed > 0 ? max(0.0, 1.0 - (Double(compressedBytesSoFar) / Double(bytesProcessed))) : 0.0
 
-        // Estimated total unknown without a target duration; provide current compressed size as estimate
+        // We don't know a target duration from here; leave time remaining nil
         return CompressionProgress(
             bytesProcessed: bytesProcessed,
             estimatedTotalBytes: compressedBytesSoFar,
             compressionRatio: reduction,
             encodingSpeedMBps: speedMBps,
             timeRemaining: nil,
-            cpuUsagePercent: 0
+            cpuUsagePercent: 0,
+            elapsedSeconds: elapsed
         )
     }
 

@@ -278,7 +278,8 @@ extension AudioCapturer: SCStreamOutput, SCStreamDelegate {
                                     let est = Double(p.estimatedTotalBytes) / 1024.0
                                     let speed = p.encodingSpeedMBps
                                     let pct = Int(p.compressionRatio * 100.0)
-                                    logger?.info(String(format: "Compression: processed=%.1f KB estCompressed=%.1f KB savings=%d%% speed=%.2f MB/s", kb, est, pct, speed))
+                                    let elapsed = Int(p.elapsedSeconds)
+                                    logger?.info(String(format: "Compression: t=%ds processed=%.1f KB estOut=%.1f KB savings=%d%% speed=%.2f MB/s", elapsed, kb, est, pct, speed))
                                     lastProgressLog = now
                                 }
                             }
