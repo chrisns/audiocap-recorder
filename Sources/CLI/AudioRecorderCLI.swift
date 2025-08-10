@@ -128,6 +128,18 @@ public struct AudioRecorderCLI: ParsableCommand {
 
         capturer.setOutputDirectory(outputDirectory)
 
+        // Optional ALAC performance reporter (verbose only)
+        var perfTimer: DispatchSourceTimer? = nil
+        if enableALAC && verbose {
+            let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
+            t.schedule(deadline: .now() + 2, repeating: 2)
+            t.setEventHandler {
+                logger.debug("ALAC encoding active...")
+            }
+            perfTimer = t
+            t.resume()
+        }
+
         let shutdown = ShutdownCoordinator(audioCapturer: capturer, fileController: FileController())
         let signalHandler = SignalHandler(signalNumber: SIGINT)
         let outDir = self.outputDirectory
@@ -137,6 +149,8 @@ public struct AudioRecorderCLI: ParsableCommand {
                 im.stopCapturing()
                 im.stopMonitoring()
             }
+            perfTimer?.cancel()
+            perfTimer = nil
             shutdown.performGracefulShutdown(finalData: nil, outputDirectory: outDir)
             Foundation.exit(0)
         }
