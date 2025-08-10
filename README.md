@@ -34,17 +34,20 @@ swift run audiocap-recorder "Spotify|Music" --output-directory ~/Desktop/audioca
 
 # Capture input devices as well (requires Microphone permission)
 swift run audiocap-recorder "Spotify|Music" --capture-inputs
+
+# Enable ALAC compression (.m4a output)
+swift run audiocap-recorder "Spotify|Music" --alac
 ```
 
 - Press Ctrl+C to stop recording gracefully.
 - Default output directory: `~/Documents/audiocap/`
-- Output filename format: `YYYY-MM-DD-HH-mm-ss.caf`
+- Output filename format: `YYYY-MM-DD-HH-mm-ss.caf` (or `.m4a` when `--alac` is used)
 - Max recording duration enforced by the app is 12 hours per session.
 
 ## Usage
 
 ```bash
-USAGE: audiocap-recorder <process-regex> [--output-directory <output-directory>] [--verbose] [--capture-inputs]
+USAGE: audiocap-recorder <process-regex> [--output-directory <output-directory>] [--verbose] [--capture-inputs] [--alac]
 
 ARGUMENTS:
   <process-regex>        Regular expression to match process names and paths
@@ -53,6 +56,7 @@ OPTIONS:
   -o, --output-directory Output directory for recordings (default: ~/Documents/audiocap)
   -v, --verbose          Enable verbose logging
   -c, --capture-inputs   Capture all audio input devices in addition to process audio (requires Microphone permission)
+  -a, --alac             Enable ALAC (Apple Lossless) compression for output files (.m4a)
   -h, --help             Show help information
 ```
 
@@ -67,6 +71,9 @@ swift run audiocap-recorder "Spotify|Music" -o ~/Desktop/captures -v
 
 # Also capture input devices (channels combined into multi-channel file)
 swift run audiocap-recorder "Spotify|Music" -c
+
+# Use ALAC compression (.m4a output)
+swift run audiocap-recorder "Spotify|Music" --alac
 
 # Run the installed/release binary directly
 /path/to/audiocap-recorder "Slack|zoom.us"
@@ -101,13 +108,17 @@ Notes:
 
 ## Multi-channel Recording (inputs + process audio)
 
-When `--capture-inputs` is provided, AudioCap4 captures available audio input devices along with process audio and writes an 8-channel `.caf` file at 48 kHz:
+When `--capture-inputs` is provided, AudioCap4 captures available audio input devices along with process audio and writes an 8-channel output at 48 kHz:
 
+- CAF mode (default): `.caf`, Float32 non-interleaved
+- ALAC mode (`--alac`): `.m4a`, Apple Lossless (lossless compression)
+
+Channel mapping:
 - Channels 1–2: Process audio (stereo)
 - Channels 3–8: Input devices (up to 6 devices, one per channel)
 - Unused channels are silent (zero-filled)
 
-A channel mapping JSON is written alongside the CAF file to document device-to-channel assignments and any device hot-swaps during the session.
+A channel mapping JSON is written alongside the audio file to document device-to-channel assignments and any device hot-swaps during the session.
 
 ### Channel mapping JSON
 
@@ -135,6 +146,12 @@ A channel mapping JSON is written alongside the CAF file to document device-to-c
 - Connecting a new input device assigns it to the next available channel (3–8)
 - Disconnecting a device marks its channel silent while preserving other channels
 - Reconnecting attempts to restore the previous channel assignment when available
+
+## ALAC vs. Uncompressed
+
+- `--alac` produces `.m4a` files using Apple Lossless (bit-perfect) compression
+- Typical size reduction: 40–60% vs. uncompressed CAF, content-dependent
+- If ALAC encoding fails, the recorder falls back to uncompressed CAF and continues recording
 
 ## Troubleshooting
 
@@ -182,4 +199,4 @@ cp ./.build/release/audiocap-recorder ~/bin/
 - Process matching uses a regular expression against discovered process names and paths. Start simple (e.g., "Chrome") and refine as needed (e.g., "com\\.google\\.Chrome").
 - On first use, confirm Screen Recording permission or re-run after granting.
 - With `--capture-inputs`, confirm Microphone permission and available input devices.
-- Output audio is written as PCM `.caf` using the app’s capture pipeline.
+- Output audio is written as PCM `.caf` by default, or `.m4a` when `--alac` is used.
