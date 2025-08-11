@@ -40,6 +40,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Swift 6.0
+        uses: swiftlang/swift-install-action@v0.4.0
+        with:
+          swift-version: "6.0"
+
       - name: Show Swift version
         run: swift --version | cat
 
@@ -89,6 +94,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Swift 6.0
+        uses: swiftlang/swift-install-action@v0.4.0
+        with:
+          swift-version: "6.0"
 
       - name: Cache SwiftPM build
         uses: actions/cache@v4
