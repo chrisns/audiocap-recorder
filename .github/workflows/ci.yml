@@ -8,9 +8,34 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Generate semantic version for the build
+  version:
+    name: Generate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.semver.outputs.semantic_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for semantic version generation
+
+      - name: Generate semantic version
+        id: semver
+        uses: lukaszraczylo/semver-generator@v1
+        with:
+          config_file: semver.yaml
+          repository_local: true
+          strict: false
+          existing: true
+
+      - name: Display generated version
+        run: echo "Generated version:${{ steps.semver.outputs.semantic_version }}"
+
   test:
     name: Build and Test
     runs-on: macos-14
+    needs: version
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,10 +52,25 @@ jobs:
             ${{ runner.os }}-spm-
 
       - name: Build (debug)
+        env:
+          AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
+          AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
+          AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
         run: swift build | cat
 
       - name: Test (with coverage)
+        env:
+          AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
+          AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
+          AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
         run: swift test --enable-code-coverage | cat
+
+      - name: Test version command
+        env:
+          AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
+          AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
+          AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+        run: .build/debug/audiocap-recorder --version
 
       - name: Upload debug binary artifact
         if: always()
@@ -43,7 +83,9 @@ jobs:
   build-release:
     name: Build Release Binary
     runs-on: macos-14
-    needs: test
+    needs: [version, test]
+    outputs:
+      version: ${{ needs.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,11 +99,99 @@ jobs:
             ${{ runner.os }}-spm-
 
       - name: Build (release)
+        env:
+          AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
+          AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
+          AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
         run: swift build -c release | cat
 
+      - name: Test release version command
+        env:
+          AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
+          AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
+          AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+        run: .build/release/audiocap-recorder --version
+
+      - name: Strip and prepare binary
+        run: |
+          strip .build/release/audiocap-recorder
+          mkdir -p release
+          cp .build/release/audiocap-recorder release/audiocap-recorder-${{ needs.version.outputs.version }}-macos
+          
       - name: Upload release binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: audiocap-recorder-release-${{ github.sha }}
-          path: .build/release/audiocap-recorder
-          if-no-files-found: warn
+          name: audiocap-recorder-release-${{ needs.version.outputs.version }}
+          path: release/audiocap-recorder-${{ needs.version.outputs.version }}-macos
+          if-no-files-found: error
+
+  # Create release only on main branch pushes (not PRs)
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [version, build-release]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: audiocap-recorder-release-${{ needs.version.outputs.version }}
+          path: ./release
+
+      - name: Create Git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ needs.version.outputs.version }}" -m "Release version ${{ needs.version.outputs.version }}"
+          git push origin "v${{ needs.version.outputs.version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          echo "Creating release notes for version ${{ needs.version.outputs.version }}"
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -n "$LAST_TAG" ]; then
+            echo "## Changes since $LAST_TAG" > release_notes.md
+            echo "" >> release_notes.md
+            git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges >> release_notes.md
+          else
+            echo "## Initial Release" > release_notes.md
+            echo "" >> release_notes.md
+            echo "First release of audiocap-recorder with semantic versioning." >> release_notes.md
+          fi
+          
+          echo "" >> release_notes.md
+          echo "## Features" >> release_notes.md
+          echo "- High-performance macOS audio capture" >> release_notes.md
+          echo "- Process filtering with regex patterns" >> release_notes.md
+          echo "- Multi-channel input support (up to 8 channels)" >> release_notes.md
+          echo "- Multiple compression formats: ALAC, AAC, MP3" >> release_notes.md
+          echo "- Professional CLI interface" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Installation" >> release_notes.md
+          echo "Download the binary, make it executable, and run:" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo 'chmod +x audiocap-recorder-${{ needs.version.outputs.version }}-macos' >> release_notes.md
+          echo './audiocap-recorder-${{ needs.version.outputs.version }}-macos --help' >> release_notes.md
+          echo '```' >> release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: Release v${{ needs.version.outputs.version }}
+          body_path: release_notes.md
+          files: |
+            release/audiocap-recorder-${{ needs.version.outputs.version }}-macos
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

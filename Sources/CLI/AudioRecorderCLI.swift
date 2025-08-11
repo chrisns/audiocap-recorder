@@ -5,7 +5,8 @@ import AVFoundation
 public struct AudioRecorderCLI: ParsableCommand {
     public static let configuration: CommandConfiguration = CommandConfiguration(
         commandName: "audiocap-recorder",
-        abstract: "Record system audio filtered to processes matching a regex. Supports uncompressed CAF, ALAC lossless (--alac), and lossy compression options (--aac/--mp3)."
+        abstract: "Record system audio filtered to processes matching a regex. Supports uncompressed CAF, ALAC lossless (--alac), and lossy compression options (--aac/--mp3).",
+        version: BuildInfo.version
     )
 
     @Argument(help: "Regular expression to match process names and paths")

@@ -1,0 +1,46 @@
+version: 1
+force:
+  major: 0
+  minor: 1
+  patch: 0
+blacklist:
+  - "Merge branch"
+  - "Merge pull request"
+  - "chore:"
+  - "docs:"
+  - "ci:"
+  - "test:"
+wording:
+  patch:
+    - fix
+    - update
+    - patch
+    - bugfix
+    - minor
+    - small
+    - tweak
+    - improve
+    - enhance
+    - refactor
+    - clean
+    - optimize
+  minor:
+    - add
+    - feature
+    - new
+    - support
+    - implement
+    - change
+    - modify
+    - extend
+    - upgrade
+  major:
+    - breaking
+    - major
+    - remove
+    - delete
+    - drop
+    - incompatible
+    - api
+    - redesign
+    - rewrite
