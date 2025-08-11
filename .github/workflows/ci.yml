@@ -79,12 +79,31 @@ jobs:
           echo "=== Debugging Coverage Setup ==="
           echo "Swift version:"
           swift --version
+          echo "Swift installation path:"
+          which swift
           echo "Xcode version:"
           xcodebuild -version || echo "xcodebuild not available"
-          echo "LLVM tools available:"
-          xcrun --find llvm-cov || echo "llvm-cov not found via xcrun"
-          xcrun llvm-cov --version || echo "Could not get llvm-cov version via xcrun"
           echo "================================"
+          
+          # Find the Swift toolchain's llvm-cov (compatible with Swift 6.1)
+          SWIFT_PATH=$(which swift)
+          SWIFT_BIN_DIR=$(dirname "$SWIFT_PATH")
+          SWIFT_LLVM_COV="$SWIFT_BIN_DIR/llvm-cov"
+          
+          echo "Checking Swift toolchain's llvm-cov:"
+          echo "Swift binary: $SWIFT_PATH"
+          echo "Swift bin dir: $SWIFT_BIN_DIR"
+          echo "Expected llvm-cov: $SWIFT_LLVM_COV"
+          
+          if [ -f "$SWIFT_LLVM_COV" ]; then
+            echo "Found Swift toolchain's llvm-cov!"
+            "$SWIFT_LLVM_COV" --version
+            LLVM_COV_CMD="$SWIFT_LLVM_COV"
+          else
+            echo "Swift toolchain's llvm-cov not found, trying xcrun..."
+            xcrun llvm-cov --version || echo "Could not get llvm-cov version via xcrun"
+            LLVM_COV_CMD="xcrun llvm-cov"
+          fi
           
           # Find the .profdata file
           PROFDATA_FILE=$(find .build -name "*.profdata" | head -1)
@@ -106,12 +125,12 @@ jobs:
           fi
           echo "Found test binary: $TEST_BINARY"
           
-          # Generate LCOV format report using xcrun to ensure correct llvm-cov version
-          echo "Generating coverage report..."
+          # Generate LCOV format report using Swift toolchain's llvm-cov
+          echo "Generating coverage report with: $LLVM_COV_CMD"
           echo "Profile data: $PROFDATA_FILE"
           echo "Test binary: $TEST_BINARY"
           
-          xcrun llvm-cov export -format="lcov" \
+          $LLVM_COV_CMD export -format="lcov" \
             -instr-profile="$PROFDATA_FILE" \
             "$TEST_BINARY" \
             -ignore-filename-regex=".build|Tests" \
