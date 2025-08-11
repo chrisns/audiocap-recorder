@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   actions: read
+  pull-requests: write
 
 jobs:
   # Generate semantic version for the build
@@ -71,6 +72,51 @@ jobs:
           AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
           AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
         run: swift test --enable-code-coverage | cat
+
+      - name: Generate code coverage report
+        run: |
+          # Find the .profdata file
+          PROFDATA_FILE=$(find .build -name "*.profdata" | head -1)
+          if [ -z "$PROFDATA_FILE" ]; then
+            echo "No .profdata file found"
+            exit 1
+          fi
+          echo "Found profdata file: $PROFDATA_FILE"
+          
+          # Get the test binary path
+          TEST_BINARY=$(find .build -name "*PackageTests.xctest" | head -1)
+          if [ -z "$TEST_BINARY" ]; then
+            # Fallback: look for any test binary
+            TEST_BINARY=$(find .build -name "*Tests" -type f -perm +111 | head -1)
+          fi
+          if [ -z "$TEST_BINARY" ]; then
+            echo "No test binary found"
+            exit 1
+          fi
+          echo "Found test binary: $TEST_BINARY"
+          
+          # Generate LCOV format report
+          xcrun llvm-cov export -format="lcov" \
+            -instr-profile="$PROFDATA_FILE" \
+            "$TEST_BINARY" \
+            -ignore-filename-regex=".build|Tests" \
+            > coverage.lcov
+          
+          echo "Generated coverage.lcov"
+          ls -la coverage.lcov
+
+      - name: Code Coverage Summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage.lcov
+          badge: true
+          fail_below_min: false
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: '60 80'
 
       - name: Test version command
         env:
