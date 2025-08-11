@@ -30,7 +30,11 @@ final class AACEncoder: AudioEncoderProtocol {
         // Prepare converter when needed
         if format.sampleRate != cfg.sampleRate || format.channelCount != AVAudioChannelCount(cfg.channelCount) {
             let dstFormat = AVAudioFormat(standardFormatWithSampleRate: cfg.sampleRate, channels: AVAudioChannelCount(cfg.channelCount))!
-            self.converter = AVAudioConverter(from: format, to: dstFormat)
+            let conv = AVAudioConverter(from: format, to: dstFormat)
+            // Prefer mastering SRC for best anti-aliasing quality when available
+            // Prefer high-quality sample rate conversion when available via option key
+            conv?.sampleRateConverterAlgorithm = AVSampleRateConverterAlgorithm_Mastering
+            self.converter = conv
         } else {
             self.converter = nil
         }

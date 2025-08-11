@@ -49,4 +49,18 @@ final class AACEncoderTests: XCTestCase {
         let stats = try enc.finalize()
         XCTAssertNotNil(stats.averageBitrate)
     }
+
+    func testSampleRateConversionPathCreatesConverter() throws {
+        let enc = AACEncoder()
+        // Request encoder sample rate to 48k while input is 44.1k
+        try enc.initialize(configuration: .init(format: .aac, bitrate: 128, enableVBR: false, sampleRate: 48000, channelCount: 2, quality: .high))
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("m4a")
+        let inFmt = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
+        _ = try enc.createAudioFile(at: tmp, format: inFmt)
+        let buf = AVAudioPCMBuffer(pcmFormat: inFmt, frameCapacity: 2048)!
+        buf.frameLength = 2048
+        _ = try enc.encode(buffer: buf)
+        let stats = try enc.finalize()
+        XCTAssertGreaterThan(stats.duration, 0)
+    }
 }
