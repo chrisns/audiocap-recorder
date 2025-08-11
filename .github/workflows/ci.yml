@@ -7,6 +7,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   # Generate semantic version for the build
   version:
@@ -147,15 +151,6 @@ jobs:
           name: audiocap-recorder-release-${{ needs.version.outputs.version }}
           path: ./release
 
-      - name: Create Git tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ needs.version.outputs.version }}" -m "Release version ${{ needs.version.outputs.version }}"
-          git push origin "v${{ needs.version.outputs.version }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Generate release notes
         id: release_notes
         run: |
@@ -189,15 +184,11 @@ jobs:
           echo './audiocap-recorder-${{ needs.version.outputs.version }}-macos --help' >> release_notes.md
           echo '```' >> release_notes.md
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ needs.version.outputs.version }}
-          name: Release v${{ needs.version.outputs.version }}
-          body_path: release_notes.md
-          files: |
+      - name: Create GitHub Release with tag
+        run: |
+          gh release create "v${{ needs.version.outputs.version }}" \
+            --title "Release v${{ needs.version.outputs.version }}" \
+            --notes-file release_notes.md \
             release/audiocap-recorder-${{ needs.version.outputs.version }}-macos
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
