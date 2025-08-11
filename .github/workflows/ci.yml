@@ -75,6 +75,17 @@ jobs:
 
       - name: Generate code coverage report
         run: |
+          # Debug information
+          echo "=== Debugging Coverage Setup ==="
+          echo "Swift version:"
+          swift --version
+          echo "Xcode version:"
+          xcodebuild -version || echo "xcodebuild not available"
+          echo "LLVM tools available:"
+          xcrun --find llvm-cov || echo "llvm-cov not found via xcrun"
+          xcrun llvm-cov --version || echo "Could not get llvm-cov version via xcrun"
+          echo "================================"
+          
           # Find the .profdata file
           PROFDATA_FILE=$(find .build -name "*.profdata" | head -1)
           if [ -z "$PROFDATA_FILE" ]; then
@@ -95,7 +106,11 @@ jobs:
           fi
           echo "Found test binary: $TEST_BINARY"
           
-          # Generate LCOV format report
+          # Generate LCOV format report using xcrun to ensure correct llvm-cov version
+          echo "Generating coverage report..."
+          echo "Profile data: $PROFDATA_FILE"
+          echo "Test binary: $TEST_BINARY"
+          
           xcrun llvm-cov export -format="lcov" \
             -instr-profile="$PROFDATA_FILE" \
             "$TEST_BINARY" \
