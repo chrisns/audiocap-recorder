@@ -34,7 +34,7 @@ jobs:
 
   test:
     name: Build and Test
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: version
     steps:
       - name: Checkout
@@ -82,7 +82,7 @@ jobs:
 
   build-release:
     name: Build Release Binary
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: [version, test]
     outputs:
       version: ${{ needs.version.outputs.version }}
