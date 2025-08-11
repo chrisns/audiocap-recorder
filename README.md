@@ -1,5 +1,12 @@
 # Audiocap Recorder
 
+[![CI](https://github.com/chrisns/audiocap-recorder/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chrisns/audiocap-recorder/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/chrisns/audiocap-recorder?sort=semver)](https://github.com/chrisns/audiocap-recorder/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/chrisns/audiocap-recorder/total)](https://github.com/chrisns/audiocap-recorder/releases)
+[![License: MIT](https://img.shields.io/github/license/chrisns/audiocap-recorder)](LICENSE)
+[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange?logo=swift)](https://www.swift.org)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue?logo=apple)](https://developer.apple.com/macos/)
+
 Process-filtered system audio recorder for macOS. This command-line tool records system audio and saves it to timestamped `.caf` files, targeting only processes whose names or bundle identifiers match a regular expression. Built with ScreenCaptureKit, AVFoundation, and swift-argument-parser.
 
 ## Requirements
