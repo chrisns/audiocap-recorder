@@ -75,49 +75,11 @@ jobs:
 
       - name: Generate code coverage report
         run: |
-          # Find the Swift toolchain's llvm-cov
-          SWIFT_PATH=$(which swift)
-          SWIFT_BIN_DIR=$(dirname "$SWIFT_PATH")
-          SWIFT_LLVM_COV="$SWIFT_BIN_DIR/llvm-cov"
+          LLVM_COV="$(dirname $(which swift))/llvm-cov"
+          PROFDATA=$(find .build -name "*.profdata" | head -1)
+          TEST_BINARY=$(find .build -name "*PackageTests.xctest" | head -1)/Contents/MacOS/*
           
-          if [ -f "$SWIFT_LLVM_COV" ]; then
-            LLVM_COV_CMD="$SWIFT_LLVM_COV"
-          else
-            LLVM_COV_CMD="xcrun llvm-cov"
-          fi
-          
-          # Find the .profdata file
-          PROFDATA_FILE=$(find .build -name "*.profdata" | head -1)
-          if [ -z "$PROFDATA_FILE" ]; then
-            echo "Error: No .profdata file found"
-            exit 1
-          fi
-          
-          # Find the test binary
-          TEST_BUNDLE=$(find .build -name "*PackageTests.xctest" | head -1)
-          if [ -n "$TEST_BUNDLE" ]; then
-            TEST_BINARY=$(find "$TEST_BUNDLE" -name "*PackageTests" -type f -perm +111 | head -1)
-            if [ -z "$TEST_BINARY" ]; then
-              TEST_BINARY=$(find "$TEST_BUNDLE/Contents/MacOS" -type f -perm +111 2>/dev/null | head -1)
-            fi
-            if [ -z "$TEST_BINARY" ]; then
-              TEST_BINARY=$(find "$TEST_BUNDLE" -type f -perm +111 | head -1)
-            fi
-          else
-            TEST_BINARY=$(find .build -name "*Tests" -type f -perm +111 | head -1)
-          fi
-          
-          if [ -z "$TEST_BINARY" ]; then
-            echo "Error: No test binary found"
-            exit 1
-          fi
-          
-          # Generate LCOV coverage report
-          $LLVM_COV_CMD export -format="lcov" \
-            -instr-profile="$PROFDATA_FILE" \
-            "$TEST_BINARY" \
-            -ignore-filename-regex=".build|Tests" \
-            > coverage.lcov
+          $LLVM_COV export -format="lcov" -instr-profile="$PROFDATA" $TEST_BINARY -ignore-filename-regex=".build|Tests" > coverage.lcov
 
       - name: Generate Coverage Summary
         run: |
