@@ -186,6 +186,7 @@ public struct AudioRecorderCLI: ParsableCommand {
             manager.startCapturing()
             inputManager = manager
             inputDelegate = combined  // Keep delegate alive
+            _ = inputDelegate // Silence warning - delegate must be retained
         }
 
         capturer.setOutputDirectory(outputDirectory)

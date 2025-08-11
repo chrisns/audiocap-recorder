@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 /// Describes a generic audio encoder used by a compression engine
-public protocol AudioEncoderProtocol {
+public protocol AudioEncoderProtocol: Sendable {
     func initialize(configuration: LossyCompressionConfiguration) throws
     func encode(buffer: AVAudioPCMBuffer) throws -> Data
     func finalize() throws -> CompressionStatistics

@@ -1,4 +1,4 @@
-# AudioCap4
+# Audiocap Recorder
 
 Process-filtered system audio recorder for macOS. This command-line tool records system audio and saves it to timestamped `.caf` files, targeting only processes whose names or bundle identifiers match a regular expression. Built with ScreenCaptureKit, AVFoundation, and swift-argument-parser.
 
@@ -160,7 +160,7 @@ Notes:
 
 ## Multi-channel Recording (inputs + process audio)
 
-When `--capture-inputs` is provided, AudioCap4 captures available audio input devices along with process audio and writes an 8-channel output at 48 kHz:
+When `--capture-inputs` is provided, Audiocap Recorder captures available audio input devices along with process audio and writes an 8-channel output at 48 kHz:
 
 - CAF mode (default): `.caf`, Float32 non-interleaved
 - ALAC mode (`--alac`): `.m4a`, Apple Lossless (lossless compression)

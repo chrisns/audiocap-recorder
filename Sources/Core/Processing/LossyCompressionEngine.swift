@@ -1,7 +1,7 @@
 @preconcurrency import AVFoundation
 import Foundation
 
-final class LossyCompressionEngine: CompressionEngineProtocol {
+final class LossyCompressionEngine: CompressionEngineProtocol, @unchecked Sendable {
     private let config: CompressionConfiguration
     private let encoder: AudioEncoderProtocol
     private var adaptiveController: AdaptiveBitrateController?

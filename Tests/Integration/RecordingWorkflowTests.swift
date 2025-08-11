@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudioCap4
+@testable import AudiocapRecorder
 
 final class RecordingWorkflowTests: XCTestCase, AudioCapturerDelegate, ProcessManagerDelegate {
     private var didStart = false

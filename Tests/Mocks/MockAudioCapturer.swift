@@ -1,5 +1,5 @@
 import Foundation
-@testable import AudioCap4
+@testable import AudiocapRecorder
 
 final class MockAudioCapturer: AudioCapturerProtocol {
     weak var delegate: AudioCapturerDelegate?

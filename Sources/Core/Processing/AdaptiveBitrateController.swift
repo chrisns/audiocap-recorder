@@ -95,7 +95,7 @@ final class AdaptiveBitrateController {
         analysisCounter += 1
         let alpha: Double = analysisCounter % 3 == 0 ? 0.7 : 0.4
         let smoothed = alpha * target + (1 - alpha) * Double(baseKbps)
-        var snapped = UInt32(min(max(minKbps, UInt32(smoothed.rounded())), maxKbps))
+        let snapped = UInt32(min(max(minKbps, UInt32(smoothed.rounded())), maxKbps))
         // Snap to common steps
         let steps: [UInt32] = [64, 96, 128, 160, 192, 224, 256, 320]
         var nearest = steps.first ?? snapped

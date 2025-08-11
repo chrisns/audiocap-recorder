@@ -1,5 +1,5 @@
 import Foundation
-@testable import AudioCap4
+@testable import AudiocapRecorder
 
 final class MockProcessManager: ProcessManagerProtocol {
     var discovered: [RecorderProcessInfo] = []

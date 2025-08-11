@@ -1,7 +1,7 @@
 import Foundation
 import AVFoundation
 
-final class AACEncoder: AudioEncoderProtocol {
+final class AACEncoder: AudioEncoderProtocol, @unchecked Sendable {
     private var audioFile: AVAudioFile?
     private var configuration: LossyCompressionConfiguration?
     private var converter: AVAudioConverter?
@@ -71,7 +71,7 @@ final class AACEncoder: AudioEncoderProtocol {
         let start = startDate ?? end
         let duration = end.timeIntervalSince(start)
         let url = audioFile?.url
-        let compressedSize = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { Int64($0 ?? 0) } ?? 0
+        let compressedSize = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { Int64($0) } ?? 0
         let avgKbps: UInt32 = duration > 0 ? UInt32((Double(compressedSize) * 8.0 / duration) / 1000.0) : cfg.bitrate
         return CompressionStatistics(
             sessionId: UUID(),

@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-public final class ProcessManager: ProcessManagerProtocol {
+public final class ProcessManager: ProcessManagerProtocol, @unchecked Sendable {
     private weak var delegate: ProcessManagerDelegate?
     private var notificationObservers: [NSObjectProtocol] = []
     private let notificationCenter: NotificationCenter

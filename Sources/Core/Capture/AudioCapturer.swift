@@ -3,7 +3,7 @@ import Foundation
 import ScreenCaptureKit
 import AppKit
 
-public final class AudioCapturer: NSObject, AudioCapturerProtocol {
+public final class AudioCapturer: NSObject, AudioCapturerProtocol, @unchecked Sendable {
     public weak var delegate: AudioCapturerDelegate?
 
     private let permissionManager: PermissionManaging

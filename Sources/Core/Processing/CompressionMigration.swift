@@ -66,8 +66,7 @@ public final class CompressionMigration {
         let outFile = try AVAudioFile(forWriting: outputURL, settings: settings, commonFormat: .pcmFormatInt16, interleaved: true)
         let bufferCapacity: AVAudioFrameCount = 4096
         let converter = AVAudioConverter(from: inputFormat, to: dstFormat)
-        var done = false
-        while !done {
+        while true {
             guard let srcBuffer = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: bufferCapacity) else { break }
             try inputFile.read(into: srcBuffer)
             if srcBuffer.frameLength == 0 { break }

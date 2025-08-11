@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "AudioCap4",
+    name: "AudiocapRecorder",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "audiocap-recorder", targets: ["AudioCap4"]),
+        .executable(name: "audiocap-recorder", targets: ["AudiocapRecorder"]),
         .executable(name: "SineWavePlayer", targets: ["SineWavePlayer"]) 
     ],
     dependencies: [
@@ -15,7 +15,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "AudioCap4",
+            name: "AudiocapRecorder",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
@@ -23,15 +23,17 @@ let package = Package(
         ),
         .executableTarget(
             name: "SineWavePlayer",
-            path: "Tools/SineWavePlayer"
+            path: "Tools/SineWavePlayer",
+            exclude: ["sine_player"]
         ),
         .testTarget(
-            name: "AudioCap4Tests",
-            dependencies: ["AudioCap4"]
+            name: "AudiocapRecorderTests",
+            dependencies: ["AudiocapRecorder"],
+            path: "Tests/AudiocapRecorderTests"
         ),
         .testTarget(
             name: "SineCaptureTests",
-            dependencies: ["AudioCap4"],
+            dependencies: ["AudiocapRecorder"],
             path: "Tests/Integration/SineCaptureTests"
         )
     ]

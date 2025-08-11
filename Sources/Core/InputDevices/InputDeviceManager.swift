@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 import CoreAudio
 
-final class InputDeviceManager: InputDeviceManagerProtocol {
+final class InputDeviceManager: InputDeviceManagerProtocol, @unchecked Sendable {
     weak var delegate: InputDeviceManagerDelegate?
 
     private var connectedDevicesByUID: [String: AudioInputDevice] = [:]
@@ -14,9 +14,14 @@ final class InputDeviceManager: InputDeviceManagerProtocol {
     private var inputNodesByUID: [String: AVAudioInputNode] = [:]
 
     func enumerateInputDevices() -> [AudioInputDevice] {
-        let devices = AVCaptureDevice.devices(for: .audio)
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.microphone, .external],
+            mediaType: .audio,
+            position: .unspecified
+        )
+        let devices = discoverySession.devices
         let mapped: [AudioInputDevice] = devices.map { device in
-            var dev = AudioInputDevice(
+            let dev = AudioInputDevice(
                 uid: device.uniqueID,
                 name: device.localizedName,
                 channelCount: 1,
@@ -140,7 +145,7 @@ extension InputDeviceManager {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var deviceID = audioDeviceID(forUID: uid)
+        let deviceID = audioDeviceID(forUID: uid)
         guard deviceID != kAudioObjectUnknown else { return .unknown }
         var transportType: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
@@ -162,7 +167,7 @@ extension InputDeviceManager {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var deviceID = audioDeviceID(forUID: uid)
+        let deviceID = audioDeviceID(forUID: uid)
         guard deviceID != kAudioObjectUnknown else { return nil }
         var size = UInt32(0)
         var status = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
