@@ -4,6 +4,8 @@ import Foundation
 final class LossyCompressionEngine: CompressionEngineProtocol {
     private let config: CompressionConfiguration
     private let encoder: AudioEncoderProtocol
+    private var adaptiveController: AdaptiveBitrateController?
+    private var suggestedKbps: UInt32?
 
     // Progress tracking
     private var bytesProcessed: Int64 = 0            // original PCM bytes processed (approx)
@@ -28,6 +30,7 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
         }
         let lossyCfg = try Self.makeLossyConfig(from: configuration)
         try self.encoder.initialize(configuration: lossyCfg)
+        self.adaptiveController = AdaptiveBitrateController(sampleRate: configuration.sampleRate)
     }
 
     func createOutputFile(at url: URL, format: AVAudioFormat) throws -> AVAudioFile {
@@ -42,6 +45,13 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
         let frames = Int(buffer.frameLength)
         let originalBytes = Int64(channels * frames * 2)
         bytesProcessed &+= originalBytes
+
+        // Adaptive bitrate suggestion (analysis only)
+        if let ctrl = adaptiveController {
+            let metrics = ctrl.analyze(buffer)
+            let suggested = ctrl.suggestBitrate(baseKbps: config.bitrate, metrics: metrics)
+            suggestedKbps = suggested
+        }
 
         // Clone buffer to avoid mutation/lifetime issues when encoding asynchronously
         guard let clone = cloneBuffer(buffer) else { return nil }
@@ -66,7 +76,8 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
         let speedMBps = elapsed > 0 ? (Double(bytesProcessed) / 1_000_000.0) / elapsed : 0
 
         // Estimate compressed bytes so far from bitrate and elapsed time
-        let bitsPerSecond = Double(config.bitrate) * 1000.0
+        let activeKbps = Double(suggestedKbps ?? config.bitrate)
+        let bitsPerSecond = activeKbps * 1000.0
         let compressedBytesSoFar = Int64((bitsPerSecond / 8.0) * max(0, elapsed))
 
         // Compute reduction ratio: 1 - compressed/original
@@ -85,6 +96,9 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
             elapsedSeconds: elapsed
         )
     }
+
+    // Exposed for tests
+    func getSuggestedBitrateKbps() -> UInt32? { suggestedKbps }
 
     private func updateDynamicQuality(cpuPercent: Double, elapsed: TimeInterval) {
         // Simple heuristic: if CPU > 85% for >2s, we would reduce quality. Since encoders are configured at init,

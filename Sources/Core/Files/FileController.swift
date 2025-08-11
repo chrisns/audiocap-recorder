@@ -195,6 +195,21 @@ public final class FileController: FileControllerProtocol {
         return url
     }
 
+    public func writeSessionMetadata(_ metadata: [String: String], to directory: String, baseFilename: String) throws -> URL {
+        let dirURL = expandTilde(in: directory)
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        let name: String
+        if baseFilename.lowercased().hasSuffix(".wav") || baseFilename.lowercased().hasSuffix(".caf") || baseFilename.lowercased().hasSuffix(".m4a") || baseFilename.lowercased().hasSuffix(".mp3") {
+            name = String(baseFilename.dropLast(4)) + "-session.json"
+        } else {
+            name = baseFilename + "-session.json"
+        }
+        let url = dirURL.appendingPathComponent(name)
+        let data = try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted])
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
     public func estimatedDiskSpaceRemaining(at directory: String) -> Int64 {
         let url = expandTilde(in: directory)
         do {

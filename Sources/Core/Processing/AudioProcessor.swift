@@ -88,6 +88,11 @@ public final class AudioProcessor: AudioProcessorProtocol {
             }
         }
 
+        // If stereo target, duplicate mono into second channel
+        if targetFormat.channelCount == 2, let chs = dest.floatChannelData {
+            memcpy(chs[1], chs[0], frameCount * MemoryLayout<Float>.size)
+        }
+
         return dest
     }
 

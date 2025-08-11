@@ -91,6 +91,20 @@ swift run audiocap-recorder "(?i)zoom" --mp3 --bitrate 192
 swift run audiocap-recorder "(?i)podcast" --aac --bitrate 96 --sample-rate 44100
 ```
 
+#### Adaptive bitrate and auto-selection
+
+- The encoder monitors content complexity and may report suggested bitrates during processing (visible in verbose progress logs). Actual encoder bitrate remains fixed for the session to ensure stable encoding; suggestions are advisory.
+- A `CompressionAdvisor` is available for estimating sizes and recommending AAC vs MP3 and bitrates based on content type and duration. See `CompressionAdvisorTests` for reference usage.
+
+#### Session metadata and compression statistics
+
+- Alongside audio and `-compression.json` statistics, the tool can emit a `-session.json` sidecar with basic session metadata when invoked programmatically via `FileController.writeSessionMetadata`.
+
+#### Migration and chaining tools (advanced)
+
+- `CompressionMigration` can transcode between formats. A `dryRun` mode is provided for safe usage in tests or previews.
+- `CompressionChaining` orchestrates multi-step conversions (e.g., AAC → MP3). Use `dryRun` in headless environments.
+
 ### Format Guidance
 
 - Speech/talk: AAC 64–128 kbps, `--bitrate 96` is a good starting point
@@ -195,7 +209,7 @@ A channel mapping JSON is written alongside the audio file to document device-to
 
 - No audio captured:
   - Verify Screen Recording permission is enabled for your terminal/Xcode
-  - Try running with a simpler regex (e.g., `"(?i)chrome"`) and confirm target process is active
+  - Try running with a simpler regex (e.g., "(?i)chrome") and confirm target process is active
 - No input device audio with `--capture-inputs`:
   - Ensure Microphone permission is granted for your terminal/Xcode
   - Confirm at least one input device is available in System Settings → Sound → Input

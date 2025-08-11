@@ -41,3 +41,33 @@ final class LossyCompressionEngineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(p.cpuUsagePercent, 0)
     }
 }
+
+final class LossyCompressionEngineAdaptiveTests: XCTestCase {
+    func testEngineReportsSuggestedBitrate() throws {
+        let cfg = CompressionConfiguration(format: .aac, bitrate: 128, quality: nil, enableVBR: true, sampleRate: 48000, channelCount: 2, enableMultiChannel: false)
+        let engine = try LossyCompressionEngine(configuration: cfg)
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let out = dir.appendingPathComponent("out.m4a")
+        let fmt = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!
+        _ = try engine.createOutputFile(at: out, format: fmt)
+        // create simple sine buffer
+        let frames = 4096
+        let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(frames))!
+        buf.frameLength = AVAudioFrameCount(frames)
+        let freq = 4000.0
+        if let ch = buf.floatChannelData {
+            for i in 0..<frames {
+                let t = Double(i) / 48000.0
+                let v = sin(2 * .pi * freq * t)
+                ch[0][i] = Float(v)
+                ch[1][i] = Float(v)
+            }
+        }
+        _ = try engine.processAudioBuffer(buf)
+        // Access internal suggested bitrate directly
+        let suggested = engine.getSuggestedBitrateKbps()
+        _ = engine.getCompressionProgress()
+        XCTAssertTrue(suggested == nil || suggested! >= 96)
+    }
+}
