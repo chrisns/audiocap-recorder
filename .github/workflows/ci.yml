@@ -7,11 +7,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  actions: read
-  pull-requests: write
-
 jobs:
   # Generate semantic version for the build
   version:
@@ -41,6 +36,8 @@ jobs:
     name: Build and Test
     runs-on: macos-latest
     needs: version
+    permissions:
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -75,95 +72,16 @@ jobs:
 
       - name: Generate code coverage report
         run: |
-          # Debug information
-          echo "=== Debugging Coverage Setup ==="
-          echo "Swift version:"
-          swift --version
-          echo "Swift installation path:"
-          which swift
-          echo "Xcode version:"
-          xcodebuild -version || echo "xcodebuild not available"
-          echo "================================"
+          LLVM_COV="$(dirname $(which swift))/llvm-cov"
+          PROFDATA=$(find .build -name "*.profdata" | head -1)
+          TEST_BINARY=$(find .build -name "*PackageTests.xctest" | head -1)/Contents/MacOS/*
           
-          # Find the Swift toolchain's llvm-cov (compatible with Swift 6.1)
-          SWIFT_PATH=$(which swift)
-          SWIFT_BIN_DIR=$(dirname "$SWIFT_PATH")
-          SWIFT_LLVM_COV="$SWIFT_BIN_DIR/llvm-cov"
-          
-          echo "Checking Swift toolchain's llvm-cov:"
-          echo "Swift binary: $SWIFT_PATH"
-          echo "Swift bin dir: $SWIFT_BIN_DIR"
-          echo "Expected llvm-cov: $SWIFT_LLVM_COV"
-          
-          if [ -f "$SWIFT_LLVM_COV" ]; then
-            echo "Found Swift toolchain's llvm-cov!"
-            "$SWIFT_LLVM_COV" --version
-            LLVM_COV_CMD="$SWIFT_LLVM_COV"
-          else
-            echo "Swift toolchain's llvm-cov not found, trying xcrun..."
-            xcrun llvm-cov --version || echo "Could not get llvm-cov version via xcrun"
-            LLVM_COV_CMD="xcrun llvm-cov"
-          fi
-          
-          # Find the .profdata file
-          PROFDATA_FILE=$(find .build -name "*.profdata" | head -1)
-          if [ -z "$PROFDATA_FILE" ]; then
-            echo "No .profdata file found"
-            exit 1
-          fi
-          echo "Found profdata file: $PROFDATA_FILE"
-          
-          # Get the test binary path
-          TEST_BUNDLE=$(find .build -name "*PackageTests.xctest" | head -1)
-          if [ -n "$TEST_BUNDLE" ]; then
-            echo "Found test bundle: $TEST_BUNDLE"
-            echo "Contents of test bundle:"
-            ls -la "$TEST_BUNDLE/" || echo "Could not list bundle contents"
-            if [ -d "$TEST_BUNDLE/Contents" ]; then
-              echo "Contents/MacOS directory:"
-              ls -la "$TEST_BUNDLE/Contents/MacOS/" 2>/dev/null || echo "No Contents/MacOS found"
-            fi
-            # Look for the actual executable inside the .xctest bundle
-            TEST_BINARY=$(find "$TEST_BUNDLE" -name "*PackageTests" -type f -perm +111 | head -1)
-            if [ -z "$TEST_BINARY" ]; then
-              # Fallback: look for any executable in Contents/MacOS/
-              TEST_BINARY=$(find "$TEST_BUNDLE/Contents/MacOS" -type f -perm +111 2>/dev/null | head -1)
-            fi
-            if [ -z "$TEST_BINARY" ]; then
-              # Another fallback: look for any executable in the bundle
-              TEST_BINARY=$(find "$TEST_BUNDLE" -type f -perm +111 | head -1)
-            fi
-          else
-            # Fallback: look for any test binary directly
-            TEST_BINARY=$(find .build -name "*Tests" -type f -perm +111 | head -1)
-          fi
-          
-          if [ -z "$TEST_BINARY" ]; then
-            echo "No test binary found"
-            echo "Available files in .build:"
-            find .build -name "*Test*" -type f | head -10
-            exit 1
-          fi
-          echo "Found test binary: $TEST_BINARY"
-          
-          # Generate LCOV format report using Swift toolchain's llvm-cov
-          echo "Generating coverage report with: $LLVM_COV_CMD"
-          echo "Profile data: $PROFDATA_FILE"
-          echo "Test binary: $TEST_BINARY"
-          
-          $LLVM_COV_CMD export -format="lcov" \
-            -instr-profile="$PROFDATA_FILE" \
-            "$TEST_BINARY" \
-            -ignore-filename-regex=".build|Tests" \
-            > coverage.lcov
-          
-          echo "Generated coverage.lcov"
-          ls -la coverage.lcov
+          $LLVM_COV export -format="lcov" -instr-profile="$PROFDATA" $TEST_BINARY -ignore-filename-regex=".build|Tests" > coverage.lcov
 
       - name: Generate Coverage Summary
         run: |
           if [ ! -f coverage.lcov ]; then
-            echo "No coverage.lcov file found"
+            echo "Error: No coverage.lcov file found"
             exit 1
           fi
           
@@ -215,9 +133,6 @@ jobs:
           echo "| 🌿 **Branch Coverage** | **${BRANCH_COVERAGE}%** | $BRANCHES_HIT / $BRANCHES_FOUND |" >> coverage_summary.md
           echo "" >> coverage_summary.md
           echo "![Coverage Badge](https://img.shields.io/badge/coverage-${LINE_COVERAGE}%25-${BADGE_COLOR})" >> coverage_summary.md
-          
-          echo "Generated coverage summary:"
-          cat coverage_summary.md
 
       - name: Comment Coverage Summary on PR
         if: github.event_name == 'pull_request'
@@ -297,6 +212,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [version, build-release]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
