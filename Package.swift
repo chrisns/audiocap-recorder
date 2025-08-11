@@ -11,7 +11,7 @@ let package = Package(
         .executable(name: "SineWavePlayer", targets: ["SineWavePlayer"]) 
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0")
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.6.1")
     ],
     targets: [
         .executableTarget(
