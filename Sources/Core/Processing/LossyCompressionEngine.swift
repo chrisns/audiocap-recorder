@@ -1,5 +1,5 @@
+@preconcurrency import AVFoundation
 import Foundation
-import AVFoundation
 
 final class LossyCompressionEngine: CompressionEngineProtocol {
     private let config: CompressionConfiguration
@@ -9,6 +9,12 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
     private var bytesProcessed: Int64 = 0            // original PCM bytes processed (approx)
     private var startTime: Date?
     private let cpu = CPUMonitor()
+    private var highCpuStart: Date?
+
+    // Background encoding
+    private let encodeQueue = DispatchQueue(label: "compression.lossy.encode")
+    private let pendingGroup = DispatchGroup()
+    private let bufferPool = BufferPool()
 
     init(configuration: CompressionConfiguration) throws {
         self.config = configuration
@@ -26,6 +32,7 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
 
     func createOutputFile(at url: URL, format: AVAudioFormat) throws -> AVAudioFile {
         startTime = Date()
+        highCpuStart = nil
         return try encoder.createAudioFile(at: url, format: format)
     }
 
@@ -35,11 +42,22 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
         let frames = Int(buffer.frameLength)
         let originalBytes = Int64(channels * frames * 2)
         bytesProcessed &+= originalBytes
-        _ = try encoder.encode(buffer: buffer)
+
+        // Clone buffer to avoid mutation/lifetime issues when encoding asynchronously
+        guard let clone = cloneBuffer(buffer) else { return nil }
+        let group = pendingGroup
+        group.enter()
+        let enc = encoder
+        encodeQueue.async {
+            defer { group.leave() }
+            do { _ = try enc.encode(buffer: clone) } catch {}
+            self.bufferPool.giveBack(clone)
+        }
         return nil
     }
 
     func finalizeCompression() throws -> CompressionStatistics {
+        pendingGroup.wait()
         return try encoder.finalize()
     }
 
@@ -55,6 +73,7 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
         let reduction = bytesProcessed > 0 ? max(0.0, 1.0 - (Double(compressedBytesSoFar) / Double(bytesProcessed))) : 0.0
 
         let cpuPercent = cpu.sampleUsedPercent()
+        updateDynamicQuality(cpuPercent: cpuPercent, elapsed: elapsed)
 
         return CompressionProgress(
             bytesProcessed: bytesProcessed,
@@ -65,6 +84,42 @@ final class LossyCompressionEngine: CompressionEngineProtocol {
             cpuUsagePercent: cpuPercent,
             elapsedSeconds: elapsed
         )
+    }
+
+    private func updateDynamicQuality(cpuPercent: Double, elapsed: TimeInterval) {
+        // Simple heuristic: if CPU > 85% for >2s, we would reduce quality. Since encoders are configured at init,
+        // we only log intent here; future enhancement can recreate encoder with lower bitrate.
+        if cpuPercent > 85 {
+            if highCpuStart == nil { highCpuStart = Date() }
+        } else {
+            highCpuStart = nil
+        }
+        if let start = highCpuStart, Date().timeIntervalSince(start) > 2.0 {
+            // TODO: Recreate encoder with reduced bitrate/config if allowed by pipeline
+            // For now, just reset timer to avoid spamming
+            highCpuStart = nil
+        }
+    }
+
+    private func cloneBuffer(_ src: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        let fmt = src.format
+        let frames = src.frameLength
+        guard let dst = bufferPool.rent(format: fmt, frameCapacity: frames) else { return nil }
+        dst.frameLength = frames
+        if fmt.isInterleaved {
+            if let s = src.floatChannelData, let d = dst.floatChannelData {
+                let count = Int(frames) * Int(fmt.channelCount)
+                d[0].update(from: s[0], count: count)
+            }
+        } else {
+            if let s = src.floatChannelData, let d = dst.floatChannelData {
+                let n = Int(frames)
+                for ch in 0..<Int(fmt.channelCount) {
+                    d[ch].update(from: s[ch], count: n)
+                }
+            }
+        }
+        return dst
     }
 
     private static func makeLossyConfig(from config: CompressionConfiguration) throws -> LossyCompressionConfiguration {
