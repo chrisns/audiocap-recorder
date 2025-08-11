@@ -47,7 +47,7 @@ swift run audiocap-recorder "Spotify|Music" --alac
 ## Usage
 
 ```bash
-USAGE: audiocap-recorder <process-regex> [--output-directory <output-directory>] [--verbose] [--capture-inputs] [--alac]
+USAGE: audiocap-recorder <process-regex> [--output-directory <output-directory>] [--verbose] [--capture-inputs] [--alac] [--aac] [--mp3] [--bitrate <kbps>] [--quality <level>] [--vbr] [--sample-rate <hz>]
 
 ARGUMENTS:
   <process-regex>        Regular expression to match process names and paths
@@ -57,8 +57,46 @@ OPTIONS:
   -v, --verbose          Enable verbose logging
   -c, --capture-inputs   Capture all audio input devices in addition to process audio (requires Microphone permission)
   -a, --alac             Enable ALAC (Apple Lossless) compression for output files (.m4a)
+      --aac              Enable AAC lossy compression for output files (.m4a)
+      --mp3              Enable MP3 lossy compression for output files (.mp3)
+      --bitrate          Set bitrate for lossy compression in kbps (64–320)
+      --quality          Set quality preset: low, medium, high, maximum
+      --vbr              Enable Variable Bitrate (VBR) (AAC only)
+      --sample-rate      Set sample rate for lossy compression (22050, 44100, 48000)
   -h, --help             Show help information
 ```
+
+### Lossy Compression
+
+- AAC (`--aac`): High quality at a given bitrate; recommended for most use cases
+- MP3 (`--mp3`): Maximum compatibility across players; stereo-only recommended
+- Bitrate (`--bitrate`): 64–320 kbps. Defaults to 128 kbps when unspecified
+- Quality (`--quality`): maps to typical bitrates (low=64, medium=128, high=192, maximum=256)
+- VBR (`--vbr`): AAC-only variable bitrate for improved quality-to-size
+- Sample rate (`--sample-rate`): 22050/44100/48000 Hz; defaults to input rate if unset. High-quality SRC is used when conversion is needed
+
+Examples:
+
+```bash
+# AAC lossy, default 128 kbps
+swift run audiocap-recorder "(?i)chrome" --aac
+
+# AAC VBR at high quality
+swift run audiocap-recorder "Spotify|Music" --aac --vbr --quality high
+
+# MP3 lossy at 192 kbps (stereo)
+swift run audiocap-recorder "(?i)zoom" --mp3 --bitrate 192
+
+# Lower bitrate for long-form speech
+swift run audiocap-recorder "(?i)podcast" --aac --bitrate 96 --sample-rate 44100
+```
+
+### Format Guidance
+
+- Speech/talk: AAC 64–128 kbps, `--bitrate 96` is a good starting point
+- Music: AAC 160–256 kbps, or MP3 192 kbps for broad compatibility
+- Long-form recordings (hours): consider 96–128 kbps to reduce disk usage
+- Multi-channel + lossy: AAC supports up to 8 channels; MP3 is best kept stereo
 
 ### Examples
 
@@ -75,8 +113,8 @@ swift run audiocap-recorder "Spotify|Music" -c
 # Use ALAC compression (.m4a output)
 swift run audiocap-recorder "Spotify|Music" --alac
 
-# Run the installed/release binary directly
-/path/to/audiocap-recorder "Slack|zoom.us"
+# Use AAC lossy at 192 kbps
+swift run audiocap-recorder "(?i)teams" --aac --bitrate 192
 ```
 
 ### Regex quick guide
@@ -165,6 +203,9 @@ A channel mapping JSON is written alongside the audio file to document device-to
   - Integration tests may skip or be limited without a main display or permissions
 - Bluetooth or USB devices:
   - Some devices introduce latency or sample-rate changes; reconnection can alter timing
+- MP3 notes:
+  - MP3 writing may not be available on all systems; the tool will report if unsupported
+  - MP3 is best used in stereo; multi-channel lossy is recommended with AAC
 
 ## Run Tests
 
