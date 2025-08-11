@@ -114,13 +114,34 @@ jobs:
           echo "Found profdata file: $PROFDATA_FILE"
           
           # Get the test binary path
-          TEST_BINARY=$(find .build -name "*PackageTests.xctest" | head -1)
-          if [ -z "$TEST_BINARY" ]; then
-            # Fallback: look for any test binary
+          TEST_BUNDLE=$(find .build -name "*PackageTests.xctest" | head -1)
+          if [ -n "$TEST_BUNDLE" ]; then
+            echo "Found test bundle: $TEST_BUNDLE"
+            echo "Contents of test bundle:"
+            ls -la "$TEST_BUNDLE/" || echo "Could not list bundle contents"
+            if [ -d "$TEST_BUNDLE/Contents" ]; then
+              echo "Contents/MacOS directory:"
+              ls -la "$TEST_BUNDLE/Contents/MacOS/" 2>/dev/null || echo "No Contents/MacOS found"
+            fi
+            # Look for the actual executable inside the .xctest bundle
+            TEST_BINARY=$(find "$TEST_BUNDLE" -name "*PackageTests" -type f -perm +111 | head -1)
+            if [ -z "$TEST_BINARY" ]; then
+              # Fallback: look for any executable in Contents/MacOS/
+              TEST_BINARY=$(find "$TEST_BUNDLE/Contents/MacOS" -type f -perm +111 2>/dev/null | head -1)
+            fi
+            if [ -z "$TEST_BINARY" ]; then
+              # Another fallback: look for any executable in the bundle
+              TEST_BINARY=$(find "$TEST_BUNDLE" -type f -perm +111 | head -1)
+            fi
+          else
+            # Fallback: look for any test binary directly
             TEST_BINARY=$(find .build -name "*Tests" -type f -perm +111 | head -1)
           fi
+          
           if [ -z "$TEST_BINARY" ]; then
             echo "No test binary found"
+            echo "Available files in .build:"
+            find .build -name "*Test*" -type f | head -10
             exit 1
           fi
           echo "Found test binary: $TEST_BINARY"
