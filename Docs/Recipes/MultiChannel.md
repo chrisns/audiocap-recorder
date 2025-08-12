@@ -302,7 +302,7 @@ let timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
 
 - Try [Adaptive Bitrate Recording](AdaptiveBitrate.md) for CPU-aware quality control
 - Explore [Mono Recording](MonoRecording.md) for simplified workflows
-- Check the [API Documentation](../../build/docs/html/) for advanced options
-- Review the [complete example](../../Examples/Recipes/MultiChannel/) source code
+- Check the API Documentation for advanced options
+- Review the complete example source code
 
 Multi-channel recording opens up professional audio production workflows, giving you complete control over each audio source for maximum post-production flexibility.

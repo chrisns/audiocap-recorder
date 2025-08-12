@@ -361,7 +361,7 @@ let capturer = AudioCapturer(alacEnabled: true)
 
 - Explore [Multi-Channel Recording](MultiChannel.md) for complex scenarios
 - Learn about [Adaptive Bitrate](AdaptiveBitrate.md) for CPU-aware recording
-- Check the [API Documentation](../../build/docs/html/) for advanced features
-- Review the [complete example](../../Examples/Recipes/MonoRecording/) source code
+- Check the API Documentation for advanced features
+- Review the complete example source code
 
 This recipe provides the foundation for efficient mono audio recording. The 50% file size reduction makes it ideal for voice content while maintaining excellent audio quality.

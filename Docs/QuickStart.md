@@ -261,8 +261,8 @@ Expected output confirms your setup is working correctly.
 
 Now that you have AudioCap Recorder running:
 
-1. **Explore Examples**: Check out the [Integration Recipes](Recipes/) for advanced usage
-2. **API Reference**: Browse the [complete API documentation](../build/docs/html/)
+1. **Explore Examples**: Check out the Integration Recipes for advanced usage
+2. **API Reference**: Browse the complete API documentation
 3. **Compression Options**: Learn about [ALAC](Recipes/ALAC.md) and [lossy compression](Recipes/LossyCompression.md)
 4. **Multi-Channel Recording**: Set up [8-channel recording](Recipes/MultiChannel.md) for complex scenarios
 
@@ -294,7 +294,7 @@ If you encounter issues:
 
 1. Check the [troubleshooting section](#troubleshooting) above
 2. Review the [complete examples](../Examples/) for working code
-3. Consult the [API documentation](../build/docs/html/) for detailed reference
+3. Consult the API documentation for detailed reference
 4. Open an issue on GitHub with your specific error messages
 
 Happy recording! 🎙️
