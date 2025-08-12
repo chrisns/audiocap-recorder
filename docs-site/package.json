@@ -1,0 +1,23 @@
+{
+  "name": "audiocap-docs-site",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prebuild": "node scripts/import-docc.mjs && node scripts/generate-versions.mjs",
+    "build": "docusaurus build",
+    "start": "docusaurus start",
+    "clean": "rimraf build",
+    "read-version": "node scripts/read-version.mjs",
+    "gen-versions": "node scripts/generate-versions.mjs",
+    "version-docs": "docusaurus docs:version $(node scripts/read-version.mjs)"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.3.2",
+    "@docusaurus/preset-classic": "3.3.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "rimraf": "5.0.5"
+  }
+}

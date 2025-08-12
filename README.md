@@ -1,13 +1,36 @@
-# Audiocap Recorder
+# AudioCap Recorder
 
 [![CI](https://github.com/chrisns/audiocap-recorder/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chrisns/audiocap-recorder/actions/workflows/ci.yml)
+[![Documentation](https://github.com/chrisns/audiocap-recorder/workflows/Documentation%20CI/badge.svg)](https://chrisns.github.io/audiocap-recorder/docs/)
 [![Release](https://img.shields.io/github/v/release/chrisns/audiocap-recorder?sort=semver)](https://github.com/chrisns/audiocap-recorder/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/chrisns/audiocap-recorder/total)](https://github.com/chrisns/audiocap-recorder/releases)
 [![License: MIT](https://img.shields.io/github/license/chrisns/audiocap-recorder)](LICENSE)
 [![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange?logo=swift)](https://www.swift.org)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue?logo=apple)](https://developer.apple.com/macos/)
 
-Process-filtered system audio recorder for macOS. This command-line tool records system audio and saves it to timestamped `.caf` files, targeting only processes whose names or bundle identifiers match a regular expression. Built with ScreenCaptureKit, AVFoundation, and swift-argument-parser.
+Process-filtered system audio recorder for macOS. This command-line tool and Swift library records system audio from specific applications and saves it to timestamped files, supporting multiple formats including CAF, ALAC, AAC, and MP3. Built with ScreenCaptureKit, AVFoundation, and swift-argument-parser.
+
+## 🚀 Quick Start
+
+**New to AudioCap Recorder?** Jump right in with our [**Quick-Start Guide**](https://chrisns.github.io/audiocap-recorder/docs/QuickStart) - you'll be recording audio in under 5 minutes!
+
+```swift
+import Core
+
+// Record Safari audio for 5 seconds
+let capturer = AudioCapturer(outputDirectoryPath: "recordings")
+let processes = try ProcessManager().discoverProcesses(matching: "Safari")
+try await capturer.startCapture(for: processes)
+```
+
+## 📖 Documentation
+
+- **[Quick-Start Guide](https://chrisns.github.io/audiocap-recorder/docs/QuickStart)** - Get recording in under 5 minutes
+- **[API Documentation](https://chrisns.github.io/audiocap-recorder/docs/api/)** - Complete Swift API reference
+- **[Integration Recipes](https://chrisns.github.io/audiocap-recorder/docs/Recipes/)** - Advanced usage examples
+  - [Mono Recording](https://chrisns.github.io/audiocap-recorder/docs/Recipes/MonoRecording) - Reduce file sizes by 50%
+  - [Multi-Channel Recording](https://chrisns.github.io/audiocap-recorder/docs/Recipes/MultiChannel) - Professional 8-channel capture
+  - [Adaptive Bitrate](https://chrisns.github.io/audiocap-recorder/docs/Recipes/AdaptiveBitrate) - CPU-aware quality control
 
 ## Requirements
 
@@ -262,3 +285,8 @@ cp ./.build/release/audiocap-recorder ~/bin/
 - On first use, confirm Screen Recording permission or re-run after granting.
 - With `--capture-inputs`, confirm Microphone permission and available input devices.
 - Output audio is written as PCM `.caf` by default, or `.m4a` when `--alac` is used.
+
+# Git History Cleaned
+
+Removed node_modules from git history to reduce repository size.
+# Trigger CI

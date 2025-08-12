@@ -1,5 +1,5 @@
 .DS_Store
-/.build
+.build/
 /Packages
 xcuserdata/
 DerivedData/
@@ -7,6 +7,11 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 .tmp/
+
+# Swift Package Manager
+Package.resolved
+*.profraw
+
 # Local tools and compiled binaries
 /Tools/SineWavePlayer/sine_player
 /Tools/**/*.o
@@ -15,3 +20,20 @@ DerivedData/
 /Tools/**/*.dylib
 /Tools/**/*.exe
 *.dSYM
+
+# Node.js and npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.npm
+.eslintcache
+
+# Docusaurus build cache
+.docusaurus/
+
+# Documentation build outputs
+build/
+/docs-site/build/
+/docs-site/static/docc/
