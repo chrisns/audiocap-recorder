@@ -293,7 +293,7 @@ Now that you have AudioCap Recorder running:
 If you encounter issues:
 
 1. Check the [troubleshooting section](#troubleshooting) above
-2. Review the [complete examples](../Examples/) for working code
+2. Review the complete examples for working code
 3. Consult the API documentation for detailed reference
 4. Open an issue on GitHub with your specific error messages
 
