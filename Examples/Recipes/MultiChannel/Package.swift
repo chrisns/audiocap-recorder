@@ -14,7 +14,7 @@ let package = Package(
         .executableTarget(
             name: "MultiChannel",
             dependencies: [
-                .product(name: "AudioCapCore", package: "AudiocapRecorder")
+                .product(name: "AudioCapCore", package: "AudioCap4")
             ]
         )
     ]
