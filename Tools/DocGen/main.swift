@@ -36,35 +36,34 @@ try? fileManager.removeItem(atPath: jsonOut)
 
 let target = "AudiocapRecorder"
 
-// HTML
+// First, extract symbol graphs
 var status = try run("swift", [
     "package", "--allow-writing-to-package-directory", "generate-documentation",
     "--target", target,
+    "--output-path", "/tmp/dummy", // We don't use this output, just need symbol extraction
+    "--symbol-graph-minimum-access-level", "internal"
+])
+
+// HTML - Use docc directly with our documentation catalog
+let symbolGraphDir = ".build/arm64-apple-macosx/extracted-symbols/audiocap4/AudiocapRecorder"
+status = try run("/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/docc", [
+    "convert", "Documentation.docc",
+    "--additional-symbol-graph-dir", symbolGraphDir,
     "--output-path", htmlOut,
-    "--format", "html",
-    "--symbol-graph-minimum-access-level", "internal",
     "--transform-for-static-hosting"
 ])
 if status != 0 { exit(status) }
 
-// Try JSON via DocC; if it fails, fall back to copying HTML data JSON
-status = try run("swift", [
-    "package", "--allow-writing-to-package-directory", "generate-documentation",
-    "--target", target,
-    "--output-path", jsonOut,
-    "--format", "json",
-    "--symbol-graph-minimum-access-level", "internal",
-    "--transform-for-static-hosting"
-])
-if status != 0 {
-    // Fallback: copy HTML data bundle JSON
-    let htmlData = htmlOut + "/data"
-    if fileManager.fileExists(atPath: htmlData) {
-        try? fileManager.removeItem(atPath: jsonOut)
-        try fileManager.copyItem(atPath: htmlData, toPath: jsonOut)
-        print("JSON generation via DocC failed; copied HTML data bundle to \(jsonOut) as fallback.")
-        status = 0
-    }
+// JSON: Copy the data directory from HTML output (contains JSON symbol data)
+let htmlData = htmlOut + "/data"
+if fileManager.fileExists(atPath: htmlData) {
+    try? fileManager.removeItem(atPath: jsonOut)
+    try fileManager.copyItem(atPath: htmlData, toPath: jsonOut)
+    print("Copied HTML data bundle to \(jsonOut) for JSON access.")
+    status = 0
+} else {
+    print("Warning: No data directory found in HTML output")
+    status = 1
 }
 if status != 0 { exit(status) }
 
