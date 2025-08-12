@@ -491,32 +491,57 @@ jobs:
     
     - name: Sanitize filenames for artifact upload
       run: |
-        echo "🧹 Sanitizing filenames for cross-platform compatibility..."
-        # Find and rename files with problematic characters
+        echo "🧹 Sanitizing filenames and directory names for cross-platform compatibility..."
+        
+        # First handle directories (must be done depth-first to avoid path issues)
+        find build/docs docs-site/build -name "*:*" -type d | sort -r | while read dir; do
+          parent=$(dirname "$dir")
+          dirname_only=$(basename "$dir")
+          # Replace colons with hyphens
+          newname=$(echo "$dirname_only" | sed 's/:/-/g')
+          if [ "$dirname_only" != "$newname" ]; then
+            echo "Renaming directory: $dirname_only -> $newname"
+            mv "$dir" "$parent/$newname"
+          fi
+        done
+        
+        # Handle other problematic characters in directories
+        find build/docs docs-site/build -name '*"*' -o -name '*<*' -o -name '*>*' -o -name '*|*' -o -name '*\**' -o -name '*?*' -type d | sort -r | while read dir; do
+          parent=$(dirname "$dir")
+          dirname_only=$(basename "$dir")
+          # Replace problematic characters with safe alternatives
+          newname=$(echo "$dirname_only" | sed 's/[":><|*?]/-/g')
+          if [ "$dirname_only" != "$newname" ]; then
+            echo "Renaming directory: $dirname_only -> $newname"
+            mv "$dir" "$parent/$newname"
+          fi
+        done
+        
+        # Now handle files with problematic characters
         find build/docs docs-site/build -name "*:*" -type f | while read file; do
           dir=$(dirname "$file")
           filename=$(basename "$file")
           # Replace colons with hyphens
           newname=$(echo "$filename" | sed 's/:/-/g')
           if [ "$filename" != "$newname" ]; then
-            echo "Renaming: $filename -> $newname"
+            echo "Renaming file: $filename -> $newname"
             mv "$file" "$dir/$newname"
           fi
         done
         
-        # Also handle other problematic characters
+        # Also handle other problematic characters in files
         find build/docs docs-site/build -name '*"*' -o -name '*<*' -o -name '*>*' -o -name '*|*' -o -name '*\**' -o -name '*?*' -type f | while read file; do
           dir=$(dirname "$file")
           filename=$(basename "$file")
           # Replace problematic characters with safe alternatives
           newname=$(echo "$filename" | sed 's/[":><|*?]/-/g')
           if [ "$filename" != "$newname" ]; then
-            echo "Renaming: $filename -> $newname"
+            echo "Renaming file: $filename -> $newname"
             mv "$file" "$dir/$newname"
           fi
         done
         
-        echo "✅ Filename sanitization completed"
+        echo "✅ Filename and directory sanitization completed"
 
     - name: Upload documentation artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
