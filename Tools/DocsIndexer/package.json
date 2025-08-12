@@ -1,0 +1,12 @@
+{
+  "name": "docs-indexer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-index": "node index.mjs"
+  },
+  "dependencies": {
+    "lunr": "2.3.9"
+  }
+}

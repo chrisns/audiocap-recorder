@@ -2,8 +2,8 @@ import Foundation
 import AVFoundation
 import CoreAudio
 
-final class InputDeviceManager: InputDeviceManagerProtocol, @unchecked Sendable {
-    weak var delegate: InputDeviceManagerDelegate?
+public final class InputDeviceManager: InputDeviceManagerProtocol, @unchecked Sendable {
+    public weak var delegate: InputDeviceManagerDelegate?
 
     private var connectedDevicesByUID: [String: AudioInputDevice] = [:]
     private var channelByUID: [String: Int] = [:] // uid -> channel (3-8)
@@ -13,7 +13,9 @@ final class InputDeviceManager: InputDeviceManagerProtocol, @unchecked Sendable 
     private var enginesByUID: [String: AVAudioEngine] = [:]
     private var inputNodesByUID: [String: AVAudioInputNode] = [:]
 
-    func enumerateInputDevices() -> [AudioInputDevice] {
+    public init() {}
+
+    public func enumerateInputDevices() -> [AudioInputDevice] {
         let discoverySession = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.microphone, .external],
             mediaType: .audio,
@@ -39,7 +41,7 @@ final class InputDeviceManager: InputDeviceManagerProtocol, @unchecked Sendable 
         return updated
     }
 
-    func startMonitoring() {
+    public func startMonitoring() {
         let center = NotificationCenter.default
         let conn = center.addObserver(forName: .AVCaptureDeviceWasConnected, object: nil, queue: .main) { [weak self] note in
             guard let self else { return }
@@ -85,22 +87,22 @@ final class InputDeviceManager: InputDeviceManagerProtocol, @unchecked Sendable 
         observers = [conn, disconn]
     }
 
-    func stopMonitoring() {
+    public func stopMonitoring() {
         for obs in observers { NotificationCenter.default.removeObserver(obs) }
         observers.removeAll()
     }
 
-    func startCapturing() {
+    public func startCapturing() {
         for (_, device) in connectedDevicesByUID {
             startCapture(for: device)
         }
     }
 
-    func stopCapturing() {
+    public func stopCapturing() {
         for uid in enginesByUID.keys { stopCapture(forUID: uid) }
     }
 
-    func currentChannelAssignments() -> [Int: AudioInputDevice] {
+    public func currentChannelAssignments() -> [Int: AudioInputDevice] {
         var result: [Int: AudioInputDevice] = [:]
         for (uid, channel) in channelByUID {
             if var dev = connectedDevicesByUID[uid] {
