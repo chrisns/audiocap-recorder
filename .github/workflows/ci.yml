@@ -134,12 +134,35 @@ jobs:
           echo "" >> coverage_summary.md
           echo "![Coverage Badge](https://img.shields.io/badge/coverage-${LINE_COVERAGE}%25-${BADGE_COLOR})" >> coverage_summary.md
 
-      - name: Comment Coverage Summary on PR
+      - name: Update PR Body with Coverage Summary
         if: github.event_name == 'pull_request'
         run: |
-          if [ -f coverage_summary.md ]; then
-            gh pr comment ${{ github.event.number }} --body-file coverage_summary.md
+          if [ ! -f coverage_summary.md ]; then
+            echo "coverage_summary.md not found; skipping"
+            exit 0
           fi
+
+          gh pr view ${{ github.event.number }} --json body -q .body > pr_body.md || echo "" > pr_body.md
+
+          {
+            echo "<!-- COVERAGE-START -->"
+            echo "### 📊 Code Coverage"
+            echo ""
+            cat coverage_summary.md
+            echo ""
+            echo "<!-- COVERAGE-END -->"
+          } > coverage_block.md
+
+          if grep -q "<!-- COVERAGE-START -->" pr_body.md; then
+            awk 'BEGIN{skip=0} /<!-- COVERAGE-START -->/{skip=1} skip==0{print} /<!-- COVERAGE-END -->/{skip=0}' pr_body.md > pr_body_clean.md
+          else
+            cp pr_body.md pr_body_clean.md
+          fi
+
+          printf "\n\n" >> pr_body_clean.md
+          cat coverage_block.md >> pr_body_clean.md
+
+          gh pr edit ${{ github.event.number }} --body-file pr_body_clean.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
