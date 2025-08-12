@@ -416,7 +416,7 @@ jobs:
         echo "🔍 Validating code snippets in documentation..."
         
         # Check for Swift syntax in markdown files
-        find Docs -name "*.md" -exec grep -l "```swift" {} \; | while read file; do
+        find Docs -name "*.md" -exec grep -l '```swift' {} \; | while read file; do
           echo "Checking Swift snippets in $file"
           # Extract Swift code blocks and validate basic syntax
           awk '/```swift/,/```/ {if (!/```/) print}' "$file" > /tmp/snippet.swift

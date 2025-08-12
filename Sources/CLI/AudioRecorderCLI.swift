@@ -1,6 +1,7 @@
 import Foundation
 import ArgumentParser
 import AVFoundation
+import Core
 
 public struct AudioRecorderCLI: ParsableCommand {
     public static let configuration: CommandConfiguration = CommandConfiguration(
