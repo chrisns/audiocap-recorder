@@ -456,8 +456,8 @@ jobs:
     
     - name: Install dependencies
       run: |
-        cd Tools/DocsIndexer && npm ci
-        cd ../../docs-site && npm ci
+        cd Tools/DocsIndexer && npm install
+        cd ../../docs-site && npm install
     
     - name: Create semver.yaml
       run: |
