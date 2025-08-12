@@ -489,6 +489,35 @@ jobs:
         npm run build
         echo "✅ Documentation site built"
     
+    - name: Sanitize filenames for artifact upload
+      run: |
+        echo "🧹 Sanitizing filenames for cross-platform compatibility..."
+        # Find and rename files with problematic characters
+        find build/docs docs-site/build -name "*:*" -type f | while read file; do
+          dir=$(dirname "$file")
+          filename=$(basename "$file")
+          # Replace colons with hyphens
+          newname=$(echo "$filename" | sed 's/:/-/g')
+          if [ "$filename" != "$newname" ]; then
+            echo "Renaming: $filename -> $newname"
+            mv "$file" "$dir/$newname"
+          fi
+        done
+        
+        # Also handle other problematic characters
+        find build/docs docs-site/build -name '*"*' -o -name '*<*' -o -name '*>*' -o -name '*|*' -o -name '*\**' -o -name '*?*' -type f | while read file; do
+          dir=$(dirname "$file")
+          filename=$(basename "$file")
+          # Replace problematic characters with safe alternatives
+          newname=$(echo "$filename" | sed 's/[":><|*?]/-/g')
+          if [ "$filename" != "$newname" ]; then
+            echo "Renaming: $filename -> $newname"
+            mv "$file" "$dir/$newname"
+          fi
+        done
+        
+        echo "✅ Filename sanitization completed"
+
     - name: Upload documentation artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
