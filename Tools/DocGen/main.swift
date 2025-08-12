@@ -44,11 +44,36 @@ var status = try run("swift", [
     "--symbol-graph-minimum-access-level", "internal"
 ])
 
+// Find the symbol graph directory dynamically
+let buildDir = ".build"
+var symbolGraphDir: String?
+
+// Look for extracted-symbols directory
+let enumerator = fileManager.enumerator(atPath: buildDir)
+while let file = enumerator?.nextObject() as? String {
+    if file.contains("extracted-symbols") && file.hasSuffix(target) {
+        symbolGraphDir = buildDir + "/" + file
+        break
+    }
+}
+
+guard let validSymbolGraphDir = symbolGraphDir else {
+    print("Error: Could not find symbol graph directory for target \(target)")
+    print("Available files in \(buildDir):")
+    if let files = try? fileManager.contentsOfDirectory(atPath: buildDir) {
+        for file in files {
+            print("  \(file)")
+        }
+    }
+    exit(1)
+}
+
+print("Using symbol graph directory: \(validSymbolGraphDir)")
+
 // HTML - Use docc directly with our documentation catalog
-let symbolGraphDir = ".build/arm64-apple-macosx/extracted-symbols/audiocap4/AudiocapRecorder"
 status = try run("/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/docc", [
     "convert", "Documentation.docc",
-    "--additional-symbol-graph-dir", symbolGraphDir,
+    "--additional-symbol-graph-dir", validSymbolGraphDir,
     "--output-path", htmlOut,
     "--transform-for-static-hosting"
 ])
@@ -56,6 +81,14 @@ if status != 0 { exit(status) }
 
 // JSON: Copy the data directory from HTML output (contains JSON symbol data)
 let htmlData = htmlOut + "/data"
+print("Checking for HTML data directory at: \(htmlData)")
+print("HTML output directory contents:")
+if let contents = try? fileManager.contentsOfDirectory(atPath: htmlOut) {
+    for item in contents {
+        print("  \(item)")
+    }
+}
+
 if fileManager.fileExists(atPath: htmlData) {
     try? fileManager.removeItem(atPath: jsonOut)
     try fileManager.copyItem(atPath: htmlData, toPath: jsonOut)
