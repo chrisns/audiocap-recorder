@@ -89,12 +89,12 @@ jobs:
           echo "" >> coverage_summary.md
           
           # Parse LCOV file for basic metrics
-          LINES_FOUND=$(grep -c "^LF:" coverage.lcov || echo "0")
-          LINES_HIT=$(grep "^LH:" coverage.lcov | awk -F: '{sum += $2} END {print sum+0}')
-          FUNCTIONS_FOUND=$(grep -c "^FNF:" coverage.lcov || echo "0") 
-          FUNCTIONS_HIT=$(grep "^FNH:" coverage.lcov | awk -F: '{sum += $2} END {print sum+0}')
-          BRANCHES_FOUND=$(grep -c "^BRF:" coverage.lcov || echo "0")
-          BRANCHES_HIT=$(grep "^BRH:" coverage.lcov | awk -F: '{sum += $2} END {print sum+0}')
+          LINES_FOUND=$(awk -F: '/^LF:/{sum+=$2} END {print sum+0}' coverage.lcov)
+          LINES_HIT=$(awk -F: '/^LH:/{sum+=$2} END {print sum+0}' coverage.lcov)
+          FUNCTIONS_FOUND=$(awk -F: '/^FNF:/{sum+=$2} END {print sum+0}' coverage.lcov)
+          FUNCTIONS_HIT=$(awk -F: '/^FNH:/{sum+=$2} END {print sum+0}' coverage.lcov)
+          BRANCHES_FOUND=$(awk -F: '/^BRF:/{sum+=$2} END {print sum+0}' coverage.lcov)
+          BRANCHES_HIT=$(awk -F: '/^BRH:/{sum+=$2} END {print sum+0}' coverage.lcov)
           
           if [ "$LINES_FOUND" -gt 0 ]; then
             LINE_COVERAGE=$(echo "scale=1; $LINES_HIT * 100 / $LINES_FOUND" | bc -l)
