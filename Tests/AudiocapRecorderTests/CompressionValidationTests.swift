@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudiocapRecorder
+ import Core
 
 final class CompressionValidationTests: XCTestCase {
     func testIntegrityDetectsMissingOrEmptyFile() {

@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
-@testable import AudiocapRecorder
+ import Core
 
 final class CoreInterfacesTests: XCTestCase {
     func testGenerateTimestampedFilenameFormat() throws {
