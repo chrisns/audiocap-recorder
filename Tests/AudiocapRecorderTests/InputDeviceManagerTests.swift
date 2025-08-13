@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class InputDeviceManagerTests: XCTestCase {
     
     // Helper methods

@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class AudioProcessorTests: XCTestCase {
     func makeSineBuffer(freq: Double, seconds: Double = 0.1, sampleRate: Double = 48_000, channels: AVAudioChannelCount = 1) -> AVAudioPCMBuffer {
         let frames = AVAudioFrameCount(seconds * sampleRate)

@@ -1,6 +1,5 @@
 import XCTest
  import Core
-
 final class FileControllerMetadataTests: XCTestCase {
     func testWriteSessionMetadataCreatesJSONFile() throws {
         let fc = FileController()

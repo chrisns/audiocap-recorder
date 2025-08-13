@@ -1,6 +1,5 @@
 import XCTest
  import Core
-
 private final class BufferSink: LogSink {
     var messages: [String] = []
     func write(_ message: String) { messages.append(message) }

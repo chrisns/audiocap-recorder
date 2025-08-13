@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class MultiChannelTests: XCTestCase {
     func testChannelMappingJSONRoundtrip() throws {
         let fc = FileController()

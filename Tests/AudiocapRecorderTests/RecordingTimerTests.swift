@@ -1,6 +1,5 @@
 import XCTest
  import Core
-
 final class RecordingTimerTests: XCTestCase {
     func testTimerTicksAndCompletes() async {
         let expectationCompleted = expectation(description: "completed")

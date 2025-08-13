@@ -1,6 +1,5 @@
 import XCTest
  import Core
-
 final class ProcessManagerTests: XCTestCase {
     func testInvalidRegexThrows() {
         let pm = ProcessManager()

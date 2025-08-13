@@ -1,6 +1,5 @@
 import XCTest
  import Core
-
 final class CompressionValidationTests: XCTestCase {
     func testIntegrityDetectsMissingOrEmptyFile() {
         let v = CompressionValidator()

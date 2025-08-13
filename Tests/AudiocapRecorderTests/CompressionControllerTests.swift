@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class CompressionControllerTests: XCTestCase {
     func testInitializeAACValidConfig() throws {
         let ctrl = CompressionController()

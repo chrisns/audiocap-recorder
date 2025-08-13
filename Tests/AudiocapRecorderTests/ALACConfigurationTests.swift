@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class ALACConfigurationTests: XCTestCase {
     func testValidateAcceptsTypicalConfig() throws {
         let cfg = ALACConfiguration(sampleRate: 48_000, channelCount: 2, bitDepth: 16, quality: .max)

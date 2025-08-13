@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class FileControllerTests: XCTestCase {
     func testCreateDirectoryAndWriteFile() throws {
         let fc = FileController()

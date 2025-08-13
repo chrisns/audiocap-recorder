@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class AACEncoderTests: XCTestCase {
     func testCreateAACSettingsCBRAndVBR() throws {
         let enc = AACEncoder()

@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 final class CoreInterfacesTests: XCTestCase {
     func testGenerateTimestampedFilenameFormat() throws {
         // Format: yyyy-MM-dd-HH-mm-ss.<ext>

@@ -1,7 +1,6 @@
 import XCTest
 import AVFoundation
  import Core
-
 private final class StubEngine: CompressionEngineProtocol {
     var lastCreated: AVAudioFile?
     var lastProcessedFrames: AVAudioFrameCount = 0
