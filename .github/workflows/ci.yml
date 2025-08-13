@@ -68,57 +68,36 @@ jobs:
           AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
           AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
           AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
-        run: |
-          set -euo pipefail
-          swift test --enable-code-coverage
+        run: set -o pipefail; swift test --enable-code-coverage | cat
 
       - name: Generate code coverage report
         run: |
-          set -euo pipefail
+          set -e
+          LLVM_COV="$(dirname $(which swift))/llvm-cov"
+          PROFDATA=$(find .build -name "*.profdata" | head -1 || true)
+          TEST_BUNDLE=$(find .build -type d -name "*.xctest" | head -1 || true)
 
-          # Resolve llvm-cov path (prefer Swift toolchain to match profdata version; fall back to Xcode)
-          SWIFT_BIN_DIR="$(dirname "$(which swift)")"
-          if [ -x "$SWIFT_BIN_DIR/llvm-cov" ]; then
-            LLVM_COV="$SWIFT_BIN_DIR/llvm-cov"
-          else
-            LLVM_COV="$(xcrun --find llvm-cov 2>/dev/null || true)"
-          fi
-
-          if [ -z "${LLVM_COV:-}" ] || ! "$LLVM_COV" --version >/dev/null 2>&1; then
-            echo "⚠️ Warning: llvm-cov not available; emitting empty coverage to avoid failure" >&2
-            : > coverage.lcov
+          if [ -z "$PROFDATA" ] || [ ! -f "$PROFDATA" ]; then
+            echo "No .profdata found; skipping coverage export"
             exit 0
           fi
 
-          # Locate coverage data
-          PROFDATA=$(find .build -name "*.profdata" -print -quit || true)
-
-          # Collect all test bundle binaries (macOS) and fall back to any test executables
-          TEST_BINS_FILE=$(mktemp)
-          # macOS .xctest bundles
-          while IFS= read -r bundle; do
-            bin=$(find "$bundle/Contents/MacOS" -type f -maxdepth 1 | head -1)
-            if [ -n "${bin:-}" ]; then echo "$bin" >> "$TEST_BINS_FILE"; fi
-          done < <(find .build -type d -name "*.xctest" | sort)
-
-          # Fallback: plain test executables (Linux or non-bundle layouts)
-          if [ ! -s "$TEST_BINS_FILE" ]; then
-            find .build -type f -name "*Tests*" -perm -111 | sort >> "$TEST_BINS_FILE" || true
+          if [ -z "$TEST_BUNDLE" ] || [ ! -d "$TEST_BUNDLE" ]; then
+            echo "No test bundle found; skipping coverage export"
+            exit 0
           fi
 
-          if [ -z "${PROFDATA:-}" ] || [ ! -s "$TEST_BINS_FILE" ]; then
-            echo "⚠️ Warning: Could not locate coverage inputs (profdata or test binaries). Creating empty coverage.lcov to avoid pipeline failure." >&2
-            : > coverage.lcov
+          if [ -d "$TEST_BUNDLE/Contents/MacOS" ]; then
+            TEST_BINARY="$TEST_BUNDLE/Contents/MacOS/$(ls -1 "$TEST_BUNDLE/Contents/MacOS" | head -1)"
           else
-            echo "Using profdata: $PROFDATA"
-            echo "Using test binaries:"
-            cat "$TEST_BINS_FILE"
-            # Export LCOV, excluding build and test sources from report. If export fails due to format mismatch, fall back to empty coverage
-            if ! xargs "$LLVM_COV" export -format="lcov" -instr-profile="$PROFDATA" -ignore-filename-regex=".build|Tests" < "$TEST_BINS_FILE" > coverage.lcov; then
-              echo "⚠️ Warning: llvm-cov export failed; emitting empty coverage to avoid pipeline failure" >&2
-              : > coverage.lcov
-            fi
+            echo "Test bundle missing Contents/MacOS; skipping coverage export"
+            exit 0
           fi
+
+          echo "Using profdata: $PROFDATA"
+          echo "Using test binary: $TEST_BINARY"
+
+          "$LLVM_COV" export -format="lcov" -instr-profile="$PROFDATA" "$TEST_BINARY" -ignore-filename-regex=".build|Tests" > coverage.lcov
 
       - name: Generate Coverage Summary
         run: |
@@ -278,6 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [version, build-release, generate-docs]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: github-pages
     permissions:
       contents: write
       pages: write
@@ -361,29 +341,50 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy Version-Specific Documentation
-        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs-artifacts/docs-site/build
-          destination_dir: docs/v${{ needs.version.outputs.version }}
-          enable_jekyll: false
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
 
-      - name: Update Latest Documentation Alias
-        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs-artifacts/docs-site/build
-          destination_dir: docs/latest
-          enable_jekyll: false
+      - name: Prepare Pages artifact (docs, latest, versioned)
+        run: |
+          set -e
+          STAGING_DIR="site"
+          DOCS_BUILD_DIR="docs-artifacts/docs-site/build"
 
-      - name: Deploy Main Documentation
-        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4
+          if [ ! -d "$DOCS_BUILD_DIR" ]; then
+            echo "Error: $DOCS_BUILD_DIR not found"
+            exit 1
+          fi
+
+          mkdir -p "$STAGING_DIR/docs" \
+                   "$STAGING_DIR/docs/v${{ needs.version.outputs.version }}" \
+                   "$STAGING_DIR/docs/latest"
+
+          echo "Copying docs build to staging..."
+          cp -a "$DOCS_BUILD_DIR/." "$STAGING_DIR/docs/"
+          cp -a "$DOCS_BUILD_DIR/." "$STAGING_DIR/docs/v${{ needs.version.outputs.version }}/"
+          cp -a "$DOCS_BUILD_DIR/." "$STAGING_DIR/docs/latest/"
+
+          echo "Staging structure:"
+          find "$STAGING_DIR" -maxdepth 2 -type d | sort
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs-artifacts/docs-site/build
-          destination_dir: docs
-          enable_jekyll: false
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Delete legacy gh-pages branch
+        if: always()
+        run: |
+          echo "Attempting to delete remote gh-pages branch (if it exists)..."
+          curl -sSL -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/gh-pages" \
+            || echo "gh-pages branch not found or already deleted"
 
       - name: Report Unified Release Status
         run: |
@@ -395,10 +396,11 @@ jobs:
           echo "  - Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.version.outputs.version }}"
           echo ""
           echo "📖 Documentation Deployment:"
-          echo "  - Main Docs: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/docs/"
-          echo "  - Version-Specific: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/docs/v${{ needs.version.outputs.version }}/"
-          echo "  - Latest Alias: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/docs/latest/"
-          echo "  - API Reference: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/docs/docc/"
+          echo "  - Pages URL: ${{ steps.deploy.outputs.page_url }}"
+          echo "  - Main Docs: ${{ steps.deploy.outputs.page_url }}docs/"
+          echo "  - Version-Specific: ${{ steps.deploy.outputs.page_url }}docs/v${{ needs.version.outputs.version }}/"
+          echo "  - Latest Alias: ${{ steps.deploy.outputs.page_url }}docs/latest/"
+          echo "  - API Reference: ${{ steps.deploy.outputs.page_url }}docs/docc/"
           echo ""
           echo "✅ Product and documentation released together with semantic version v${{ needs.version.outputs.version }}"
 
@@ -488,7 +490,7 @@ jobs:
       uses: swift-actions/setup-swift@682457186b71c25a884c45c06f859febbe259240 # v2
     
     - name: Setup Node.js
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'

@@ -28,9 +28,29 @@ if (fs.existsSync(versionsPath)) {
 }
 
 const latest = version;
+
+function toRelativeUrl(u) {
+  if (!u || typeof u !== "string") return "./";
+  // Normalize to a path relative to the site baseUrl
+  if (u.startsWith("http://") || u.startsWith("https://")) return u; // leave external URLs
+  if (u.startsWith("/")) {
+    // Strip any leading path and keep only the tail after '/docs/' if present
+    const idx = u.indexOf("/docs/");
+    if (idx >= 0) return "." + u.slice(idx + "/docs".length);
+    return "." + u; // make relative
+  }
+  return u; // already relative
+}
+
 const entries = [
-  { version, url: `/docs/${version}/`, latest: true },
-  ...existing.filter(v => v.version !== version).map(v => ({ ...v, latest: v.version === latest }))
+  { version, url: `./v${version}/`, latest: true },
+  ...existing
+    .filter((v) => v.version !== version)
+    .map((v) => ({
+      ...v,
+      url: toRelativeUrl(v.url),
+      latest: v.version === latest,
+    })),
 ];
 
 fs.writeFileSync(versionsPath, JSON.stringify(entries, null, 2));
