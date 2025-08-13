@@ -68,15 +68,57 @@ jobs:
           AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
           AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
           AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
-        run: swift test --enable-code-coverage | cat
+        run: |
+          set -euo pipefail
+          swift test --enable-code-coverage
 
       - name: Generate code coverage report
         run: |
-          LLVM_COV="$(dirname $(which swift))/llvm-cov"
-          PROFDATA=$(find .build -name "*.profdata" | head -1)
-          TEST_BINARY=$(find .build -name "*PackageTests.xctest" | head -1)/Contents/MacOS/*
-          
-          $LLVM_COV export -format="lcov" -instr-profile="$PROFDATA" $TEST_BINARY -ignore-filename-regex=".build|Tests" > coverage.lcov
+          set -euo pipefail
+
+          # Resolve llvm-cov path (prefer Swift toolchain to match profdata version; fall back to Xcode)
+          SWIFT_BIN_DIR="$(dirname "$(which swift)")"
+          if [ -x "$SWIFT_BIN_DIR/llvm-cov" ]; then
+            LLVM_COV="$SWIFT_BIN_DIR/llvm-cov"
+          else
+            LLVM_COV="$(xcrun --find llvm-cov 2>/dev/null || true)"
+          fi
+
+          if [ -z "${LLVM_COV:-}" ] || ! "$LLVM_COV" --version >/dev/null 2>&1; then
+            echo "⚠️ Warning: llvm-cov not available; emitting empty coverage to avoid failure" >&2
+            : > coverage.lcov
+            exit 0
+          fi
+
+          # Locate coverage data
+          PROFDATA=$(find .build -name "*.profdata" -print -quit || true)
+
+          # Collect all test bundle binaries (macOS) and fall back to any test executables
+          TEST_BINS_FILE=$(mktemp)
+          # macOS .xctest bundles
+          while IFS= read -r bundle; do
+            bin=$(find "$bundle/Contents/MacOS" -type f -maxdepth 1 | head -1)
+            if [ -n "${bin:-}" ]; then echo "$bin" >> "$TEST_BINS_FILE"; fi
+          done < <(find .build -type d -name "*.xctest" | sort)
+
+          # Fallback: plain test executables (Linux or non-bundle layouts)
+          if [ ! -s "$TEST_BINS_FILE" ]; then
+            find .build -type f -name "*Tests*" -perm -111 | sort >> "$TEST_BINS_FILE" || true
+          fi
+
+          if [ -z "${PROFDATA:-}" ] || [ ! -s "$TEST_BINS_FILE" ]; then
+            echo "⚠️ Warning: Could not locate coverage inputs (profdata or test binaries). Creating empty coverage.lcov to avoid pipeline failure." >&2
+            : > coverage.lcov
+          else
+            echo "Using profdata: $PROFDATA"
+            echo "Using test binaries:"
+            cat "$TEST_BINS_FILE"
+            # Export LCOV, excluding build and test sources from report. If export fails due to format mismatch, fall back to empty coverage
+            if ! xargs "$LLVM_COV" export -format="lcov" -instr-profile="$PROFDATA" -ignore-filename-regex=".build|Tests" < "$TEST_BINS_FILE" > coverage.lcov; then
+              echo "⚠️ Warning: llvm-cov export failed; emitting empty coverage to avoid pipeline failure" >&2
+              : > coverage.lcov
+            fi
+          fi
 
       - name: Generate Coverage Summary
         run: |

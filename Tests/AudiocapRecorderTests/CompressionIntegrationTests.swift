@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 @testable import AudiocapRecorder
+@testable import Core
 
 final class CompressionIntegrationTests: XCTestCase {
     func testAACEstimatedFileSizeRoughlyMatchesBitrate() throws {

@@ -1,5 +1,6 @@
 import XCTest
 @testable import AudiocapRecorder
+@testable import Core
 
 private final class BufferSink: LogSink {
     var messages: [String] = []
