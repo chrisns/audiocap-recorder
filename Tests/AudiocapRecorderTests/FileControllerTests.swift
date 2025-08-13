@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class FileControllerTests: XCTestCase {
     func testCreateDirectoryAndWriteFile() throws {
         let fc = FileController()

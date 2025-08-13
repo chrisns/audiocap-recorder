@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class EightChannelWAVTests: XCTestCase {
     private func makeSineBuffer(freq: Double, seconds: Double = 0.1, sampleRate: Double = 48_000, channels: AVAudioChannelCount = 1, amplitude: Float = 0.5) -> AVAudioPCMBuffer {
         let frames = AVAudioFrameCount(seconds * sampleRate)

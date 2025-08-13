@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class CompressionControllerTests: XCTestCase {
     func testInitializeAACValidConfig() throws {
         let ctrl = CompressionController()

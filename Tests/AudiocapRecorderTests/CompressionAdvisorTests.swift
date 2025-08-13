@@ -1,5 +1,5 @@
 import XCTest
- import AudiocapRecorder
+ import Core
 final class CompressionAdvisorTests: XCTestCase {
     func testEstimateSizeMatchesBitrate() {
         let adv = CompressionAdvisor()

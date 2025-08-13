@@ -1,5 +1,5 @@
 import XCTest
- import AudiocapRecorder
+ import Core
 final class CompressionMigrationTests: XCTestCase {
     func testDryRunCreatesOutputFile() throws {
         let migrator = CompressionMigration()

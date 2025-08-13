@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class AdaptiveBitrateControllerTests: XCTestCase {
     private func makeBuffer(sineHz: Double?, noiseAmplitude: Float, frames: Int = 4096, sampleRate: Double = 48000, channels: Int = 2) -> AVAudioPCMBuffer {
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: AVAudioChannelCount(channels))!

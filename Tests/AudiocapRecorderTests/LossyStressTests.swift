@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class LossyStressTests: XCTestCase {
     func testAACStressLargeBuffers() throws {
         let cfg = CompressionConfiguration(format: .aac, bitrate: 192, quality: .high, enableVBR: false, sampleRate: 44100, channelCount: 2, enableMultiChannel: false)

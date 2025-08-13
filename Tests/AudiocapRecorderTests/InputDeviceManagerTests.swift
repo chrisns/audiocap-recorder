@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class InputDeviceManagerTests: XCTestCase {
     
     // Helper methods

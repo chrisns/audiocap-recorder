@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class CompressionIntegrationTests: XCTestCase {
     func testAACEstimatedFileSizeRoughlyMatchesBitrate() throws {
         let enc = AACEncoder()

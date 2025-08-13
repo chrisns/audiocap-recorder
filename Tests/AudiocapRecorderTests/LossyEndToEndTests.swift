@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class LossyEndToEndTests: XCTestCase {
     func testAACEndToEndWritesM4AReadable() throws {
         let cfg = CompressionConfiguration(format: .aac, bitrate: 128, quality: .medium, enableVBR: false, sampleRate: 44100, channelCount: 2, enableMultiChannel: false)

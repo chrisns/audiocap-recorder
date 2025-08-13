@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import AudiocapRecorder
+ import Core
 final class MP3EncoderTests: XCTestCase {
     func testInitializeConstraints() {
         let enc = MP3Encoder()

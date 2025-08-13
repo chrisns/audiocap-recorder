@@ -1,5 +1,5 @@
 import XCTest
- import AudiocapRecorder
+ import Core
 final class ErrorPresenterTests: XCTestCase {
     func testPermissionDeniedMessage() {
         let presenter = ErrorPresenter()
