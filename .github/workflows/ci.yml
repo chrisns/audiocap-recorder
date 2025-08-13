@@ -72,11 +72,32 @@ jobs:
 
       - name: Generate code coverage report
         run: |
+          set -e
           LLVM_COV="$(dirname $(which swift))/llvm-cov"
-          PROFDATA=$(find .build -name "*.profdata" | head -1)
-          TEST_BINARY=$(find .build -name "*PackageTests.xctest" | head -1)/Contents/MacOS/*
-          
-          $LLVM_COV export -format="lcov" -instr-profile="$PROFDATA" $TEST_BINARY -ignore-filename-regex=".build|Tests" > coverage.lcov
+          PROFDATA=$(find .build -name "*.profdata" | head -1 || true)
+          TEST_BUNDLE=$(find .build -type d -name "*.xctest" | head -1 || true)
+
+          if [ -z "$PROFDATA" ] || [ ! -f "$PROFDATA" ]; then
+            echo "No .profdata found; skipping coverage export"
+            exit 0
+          fi
+
+          if [ -z "$TEST_BUNDLE" ] || [ ! -d "$TEST_BUNDLE" ]; then
+            echo "No test bundle found; skipping coverage export"
+            exit 0
+          fi
+
+          if [ -d "$TEST_BUNDLE/Contents/MacOS" ]; then
+            TEST_BINARY="$TEST_BUNDLE/Contents/MacOS/$(ls -1 "$TEST_BUNDLE/Contents/MacOS" | head -1)"
+          else
+            echo "Test bundle missing Contents/MacOS; skipping coverage export"
+            exit 0
+          fi
+
+          echo "Using profdata: $PROFDATA"
+          echo "Using test binary: $TEST_BINARY"
+
+          "$LLVM_COV" export -format="lcov" -instr-profile="$PROFDATA" "$TEST_BINARY" -ignore-filename-regex=".build|Tests" > coverage.lcov
 
       - name: Generate Coverage Summary
         run: |
