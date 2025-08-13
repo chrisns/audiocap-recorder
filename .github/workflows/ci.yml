@@ -68,7 +68,7 @@ jobs:
           AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
           AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
           AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
-        run: swift test --enable-code-coverage | cat
+        run: set -o pipefail; swift test --enable-code-coverage | cat
 
       - name: Generate code coverage report
         run: |
