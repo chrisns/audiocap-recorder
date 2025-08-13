@@ -1,7 +1,9 @@
 (function(){
   async function loadVersions(){
     try{
-      const res = await fetch('/versions.json');
+      const baseUrl =
+        (window.__docusaurus && window.__docusaurus.baseUrl) || "/";
+      const res = await fetch(baseUrl.replace(/\/$/, "") + "/versions.json");
       if(!res.ok) return;
       const versions = await res.json();
       const el = document.getElementById('version-switcher');
@@ -14,11 +16,21 @@
         const o = document.createElement('option');
         o.value = opt.url;
         o.textContent = opt.latest && !opt.label ? 'latest' : opt.label + (opt.latest ? ' (latest)' : '');
-        if(current.startsWith(opt.url)) o.selected = true;
+        try {
+          const u = new URL(opt.url, window.location.href);
+          if (current.startsWith(u.pathname)) o.selected = true;
+        } catch {
+          if (current.startsWith(opt.url)) o.selected = true;
+        }
         select.appendChild(o);
       }
       select.addEventListener('change', ()=>{
-        window.location.href = select.value;
+        const u = select.value;
+        try {
+          window.location.href = new URL(u, window.location.href).href;
+        } catch {
+          window.location.href = u;
+        }
       });
       el.innerHTML = '';
       el.appendChild(select);
