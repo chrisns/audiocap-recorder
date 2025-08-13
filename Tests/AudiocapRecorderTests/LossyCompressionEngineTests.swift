@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 @testable import AudiocapRecorder
+@testable import Core
 
 final class LossyCompressionEngineTests: XCTestCase {
     func testInitWithAACAndProcessProgress() throws {

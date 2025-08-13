@@ -68,7 +68,9 @@ jobs:
           AUDIOCAP_VERSION: ${{ needs.version.outputs.version }}
           AUDIOCAP_GIT_COMMIT: ${{ github.sha }}
           AUDIOCAP_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
-        run: swift test --enable-code-coverage | cat
+        run: |
+          set -euo pipefail
+          swift test --enable-code-coverage
 
       - name: Generate code coverage report
         run: |
@@ -80,9 +82,6 @@ jobs:
           else
             LLVM_COV="$(dirname "$(which swift)")/llvm-cov"
           fi
-
-          # Run tests with coverage (no-op if already executed)
-          swift test --enable-code-coverage | cat
 
           # Locate coverage data
           PROFDATA=$(find .build -name "*.profdata" -print -quit || true)

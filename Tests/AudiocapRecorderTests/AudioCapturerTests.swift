@@ -1,5 +1,6 @@
 import XCTest
 @testable import AudiocapRecorder
+@testable import Core
 
 private final class DeniedPermissionManager: PermissionManaging {
     func checkScreenRecordingPermission() -> Bool { false }

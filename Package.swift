@@ -36,12 +36,12 @@ let package = Package(
         ),
         .testTarget(
             name: "AudiocapRecorderTests",
-            dependencies: ["AudiocapRecorder"],
+            dependencies: ["AudiocapRecorder", "Core"],
             path: "Tests/AudiocapRecorderTests"
         ),
         .testTarget(
             name: "SineCaptureTests",
-            dependencies: ["AudiocapRecorder"],
+            dependencies: ["AudiocapRecorder", "Core"],
             path: "Tests/Integration/SineCaptureTests"
         ),
         .executableTarget(

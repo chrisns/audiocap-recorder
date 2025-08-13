@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 @testable import AudiocapRecorder
+@testable import Core
 
 private final class StubEngine: CompressionEngineProtocol {
     var lastCreated: AVAudioFile?

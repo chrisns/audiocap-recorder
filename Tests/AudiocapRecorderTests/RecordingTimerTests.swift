@@ -1,5 +1,6 @@
 import XCTest
 @testable import AudiocapRecorder
+@testable import Core
 
 final class RecordingTimerTests: XCTestCase {
     func testTimerTicksAndCompletes() async {
