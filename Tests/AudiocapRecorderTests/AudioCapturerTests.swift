@@ -1,5 +1,5 @@
 import XCTest
- import Core
+ import AudiocapRecorder
 private final class DeniedPermissionManager: PermissionManaging {
     func checkScreenRecordingPermission() -> Bool { false }
     func requestScreenRecordingPermission() {}

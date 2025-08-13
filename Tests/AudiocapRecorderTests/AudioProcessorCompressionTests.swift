@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import Core
+ import AudiocapRecorder
 private final class StubEngine: CompressionEngineProtocol {
     var lastCreated: AVAudioFile?
     var lastProcessedFrames: AVAudioFrameCount = 0

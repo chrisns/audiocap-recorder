@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import Core
+ import AudiocapRecorder
 final class FileControllerCompressedTests: XCTestCase {
     func testCreateCompressedFileM4AAndMP3() throws {
         let fc = FileController()

@@ -1,5 +1,5 @@
 import XCTest
- import Core
+ import AudiocapRecorder
 final class CompressionModelsTests: XCTestCase {
     func testCompressionFormatFileExtensionMapping() {
         XCTAssertEqual(CompressionConfiguration.CompressionFormat.aac.fileExtension, "m4a")

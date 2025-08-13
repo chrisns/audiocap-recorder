@@ -1,5 +1,5 @@
 import XCTest
- import Core
+ import AudiocapRecorder
 final class SignalHandlerTests: XCTestCase {
     func testSignalHandlerReceivesSignal() async {
         let handler = SignalHandler(signalNumber: SIGUSR1, queue: .main)

@@ -1,5 +1,5 @@
 import XCTest
- import Core
+ import AudiocapRecorder
 final class FileControllerMetadataTests: XCTestCase {
     func testWriteSessionMetadataCreatesJSONFile() throws {
         let fc = FileController()

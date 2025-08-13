@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import Core
+ import AudiocapRecorder
 final class LossyMultiChannelSimulationTests: XCTestCase {
     func testSimulatedMultiChannelWithLossyEngineDoesNotCrash() throws {
         // Simulate process stereo + 6 mono inputs => 8-channel combine, with lossy engine receiving process mono

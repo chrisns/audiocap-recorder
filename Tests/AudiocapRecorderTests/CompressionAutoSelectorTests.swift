@@ -1,5 +1,5 @@
 import XCTest
- import Core
+ import AudiocapRecorder
 final class CompressionAutoSelectorTests: XCTestCase {
     func testAutoSelectForSpeechShortDurationPrefersAAC() {
         let selector = CompressionAutoSelector()

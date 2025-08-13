@@ -1,6 +1,6 @@
 import XCTest
 import AVFoundation
- import Core
+ import AudiocapRecorder
 final class LossyCompressionEngineTests: XCTestCase {
     func testInitWithAACAndProcessProgress() throws {
         let cfg = CompressionConfiguration(format: .aac, bitrate: 128, quality: .medium, enableVBR: true, sampleRate: 44100, channelCount: 2, enableMultiChannel: false)

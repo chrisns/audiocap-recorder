@@ -1,5 +1,5 @@
 import XCTest
- import Core
+ import AudiocapRecorder
 final class ProcessManagerTests: XCTestCase {
     func testInvalidRegexThrows() {
         let pm = ProcessManager()
